@@ -1,0 +1,19 @@
+{
+  "name": "griskus-backend",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "nodemon server.js",
+    "scrape": "node scripts/scrape.js"
+  },
+  "dependencies": {
+    "axios": "^1.7.0",
+    "cheerio": "^1.0.0",
+    "cors": "^2.8.5",
+    "express": "^4.19.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.0"
+  }
+}
