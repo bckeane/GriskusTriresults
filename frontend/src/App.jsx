@@ -34,7 +34,6 @@ class StatsErrorBoundary extends Component {
 
 function parseRoute() {
   const params = new URLSearchParams(window.location.search);
-  const athlete = params.get('athlete'); // "FirstName LastName" encoded as "LastName/FirstName"
   const lastName = params.get('lastName');
   const firstName = params.get('firstName');
   const year = params.get('year');
@@ -63,7 +62,6 @@ export default function App() {
       .catch(() => {});
   }, []);
 
-  // Handle browser back/forward
   useEffect(() => {
     const onPop = () => setRoute(parseRoute());
     window.addEventListener('popstate', onPop);
@@ -92,28 +90,35 @@ export default function App() {
   };
 
   const isHome = route.view === 'home';
+  const totalResults = status?.totalResults;
+  const yearRange = status?.yearRange;
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      <header className="bg-white border-b border-slate-200 shadow-sm">
-        <div className="mx-auto max-w-5xl px-4 py-5">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div>
-              <h1
-                className="text-2xl font-bold text-slate-900 cursor-pointer hover:text-brand-700 transition-colors"
-                onClick={handleBack}
-              >
-                Pat Griskus Triathlon
-              </h1>
-              <p className="text-sm text-slate-500 mt-0.5">
-                Results archive · 1999–2025 · Waterbury, CT
-              </p>
-            </div>
+    <div className="min-h-screen bg-[#fafaf8]">
+      {/* Header */}
+      <header className="bg-white border-b border-slate-200">
+        <div className="mx-auto max-w-5xl px-4 py-4">
+          <div className="flex items-center justify-between gap-4">
+            <button
+              onClick={handleBack}
+              className="text-left group"
+            >
+              <div className="font-display text-2xl font-bold tracking-tight text-brand-900 leading-none group-hover:text-brand-700 transition-colors">
+                Pat Griskus
+              </div>
+              <div className="font-display text-xs font-500 tracking-[0.2em] text-slate-400 uppercase mt-0.5">
+                Triathlon · Waterbury CT
+              </div>
+            </button>
             <div className="flex items-center gap-3">
-              {isHome && <SearchBar onSelect={handleSelectAthlete} />}
+              {isHome && (
+                <div className="hidden sm:block">
+                  <SearchBar onSelect={handleSelectAthlete} />
+                </div>
+              )}
               <button
                 onClick={handleViewStats}
-                className="text-sm text-slate-500 hover:text-slate-900 transition-colors whitespace-nowrap"
+                className="text-sm text-slate-500 hover:text-brand-700 transition-colors whitespace-nowrap font-medium"
               >
                 Race Stats
               </button>
@@ -138,20 +143,44 @@ export default function App() {
           />
         ) : route.view === 'stats' ? (
           <StatsErrorBoundary>
-            <Suspense fallback={<div className="flex justify-center py-16"><svg className="h-8 w-8 animate-spin text-brand-500" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" /></svg></div>}>
+            <Suspense fallback={
+              <div className="flex justify-center py-16">
+                <svg className="h-8 w-8 animate-spin text-brand-500" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+                </svg>
+              </div>
+            }>
               <StatsView onBack={handleBack} />
             </Suspense>
           </StatsErrorBoundary>
         ) : (
-          <div className="mx-auto max-w-5xl space-y-8">
-            <div className="rounded-2xl bg-gradient-to-br from-brand-600 to-brand-900 p-8 text-white text-center shadow-lg">
-              <h2 className="text-2xl font-bold mb-2">Find Your Results</h2>
-              <p className="text-brand-100 mb-6 text-sm">
-                Search across {status?.totalResults?.toLocaleString() || '...'} finisher records
-                from {status?.yearRange ? `${status.yearRange.min}–${status.yearRange.max}` : '1999–2025'}
-              </p>
-              <div className="flex justify-center">
-                <SearchBar onSelect={handleSelectAthlete} />
+          /* Home view */
+          <div className="space-y-8">
+            {/* Hero: bold finisher count statement */}
+            <div className="bg-brand-900 rounded-2xl px-8 py-10 text-white overflow-hidden relative">
+              {/* Subtle texture: discipline letters anchored to bottom-right of the card */}
+              <div className="absolute bottom-0 right-0 flex gap-1 opacity-[0.08] select-none pointer-events-none" aria-hidden="true">
+                <span className="font-display text-[130px] font-bold leading-none">S</span>
+                <span className="font-display text-[130px] font-bold leading-none">B</span>
+                <span className="font-display text-[130px] font-bold leading-none">R</span>
+              </div>
+              <div className="relative">
+                <div className="font-display text-[72px] sm:text-[96px] font-bold leading-none text-white tracking-tight">
+                  {totalResults ? totalResults.toLocaleString() : '—'}
+                </div>
+                <div className="font-display text-base sm:text-lg font-medium text-brand-300 tracking-[0.15em] uppercase mt-1">
+                  Finisher records
+                </div>
+                <div className="mt-6 text-brand-200 text-sm">
+                  {yearRange ? `${yearRange.min}–${yearRange.max}` : '1999–2025'} · Waterbury, Connecticut
+                </div>
+                <div className="mt-5 sm:hidden">
+                  <SearchBar onSelect={handleSelectAthlete} />
+                </div>
+                <div className="hidden sm:block mt-5 max-w-md">
+                  <SearchBar onSelect={handleSelectAthlete} />
+                </div>
               </div>
             </div>
 

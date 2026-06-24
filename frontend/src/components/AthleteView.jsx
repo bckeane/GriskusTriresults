@@ -28,8 +28,8 @@ function Badge({ label }) {
 function StatCard({ label, value }) {
   return (
     <div className="rounded-lg bg-white border border-slate-200 px-4 py-3 text-center shadow-sm">
-      <div className="text-2xl font-bold text-slate-900">{value}</div>
-      <div className="text-xs text-slate-500 mt-0.5">{label}</div>
+      <div className="font-display text-3xl font-bold text-brand-900 leading-tight">{value}</div>
+      <div className="text-xs text-slate-500 mt-0.5 tracking-wide">{label}</div>
     </div>
   );
 }
@@ -79,12 +79,12 @@ function RaceTypeTable({ raceType, results }) {
                 <td className="py-3 px-4 text-sm font-medium text-slate-900">{r.year}</td>
                 <td className="py-3 px-4 text-sm text-slate-700">
                   {r.place != null ? (
-                    <span className={r.place <= 3 ? 'font-bold text-amber-600' : ''}>#{r.place}</span>
+                    <span className={r.place <= 3 ? 'font-bold text-finish-600' : ''}>#{r.place}</span>
                   ) : '—'}
                 </td>
                 <td className="py-3 px-4 text-sm text-slate-500">
                   {r.divRank != null
-                    ? <span className={r.divRank <= 3 ? 'font-semibold text-amber-600' : ''}>{r.divRank}/{r.divTotal}</span>
+                    ? <span className={r.divRank <= 3 ? 'font-semibold text-finish-600' : ''}>{r.divRank}/{r.divTotal}</span>
                     : <span title={r.division || ''}>{r.division || '—'}</span>}
                 </td>
                 <td className="py-3 px-4 text-sm text-slate-700 tabular-nums">{r.swimTime || '—'}</td>
@@ -178,10 +178,14 @@ export default function AthleteView({ firstName, lastName, onBack }) {
         </button>
       </div>
 
-      <div>
-        <h2 className="text-3xl font-bold text-slate-900">{data?.fullName}</h2>
-        <p className="mt-1 text-slate-500">
+      {/* Athlete nameplate — the signature element */}
+      <div className="border-t-2 border-brand-900 pt-4">
+        <h2 className="font-display text-5xl sm:text-6xl font-bold tracking-tight text-brand-900 leading-none">
+          {data?.fullName?.toUpperCase()}
+        </h2>
+        <p className="mt-2 font-display text-sm tracking-[0.2em] text-slate-400 uppercase">
           {years.length > 0 && `${years[0]}${years.length > 1 ? ` – ${years[years.length - 1]}` : ''}`}
+          {results.length > 0 && ` · ${results.length} race${results.length !== 1 ? 's' : ''}`}
         </p>
       </div>
 

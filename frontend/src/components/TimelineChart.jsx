@@ -5,9 +5,9 @@ import {
 import { parseTimeSeconds, formatSeconds } from '../utils/time.js';
 
 const RACE_TYPE_COLOR = {
-  Olympic:  '#3b82f6',
+  Olympic:  '#1a5078',  // brand-700
   Sprint:   '#10b981',
-  Duathlon: '#f59e0b',
+  Duathlon: '#e8962a',  // finish-500
 };
 
 function fallbackColor(raceType) {
@@ -80,7 +80,7 @@ function PBDot({ cx, cy, payload, dataKey, typePB, ...rest }) {
   if (val === null || val === undefined) return null;
   const isPB = val === typePB[dataKey];
   if (isPB) {
-    return <Dot cx={cx} cy={cy} r={6} fill="#f59e0b" stroke="#fff" strokeWidth={2} />;
+    return <Dot cx={cx} cy={cy} r={6} fill="#e8962a" stroke="#fff" strokeWidth={2} />;
   }
   return <Dot cx={cx} cy={cy} r={3} fill={rest.stroke} stroke={rest.stroke} />;
 }
@@ -127,7 +127,7 @@ export default function TimelineChart({ results, summary }) {
 
   return (
     <div className="rounded-xl border border-slate-200 bg-white shadow-sm p-4">
-      <h3 className="text-sm font-semibold text-slate-600 mb-3">Finish Time History</h3>
+      <h3 className="font-display text-base font-semibold text-brand-900 tracking-tight mb-3 uppercase">Finish Time History</h3>
       <ResponsiveContainer width="100%" height={220}>
         <LineChart data={data} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />

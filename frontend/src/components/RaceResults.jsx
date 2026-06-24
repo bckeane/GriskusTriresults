@@ -53,9 +53,9 @@ export default function RaceResults({ year, raceType, onBack, onSelectAthlete })
   }, [rows]);
 
   const TYPE_COLOR = {
-    Olympic: 'text-blue-700 bg-blue-100',
-    Sprint: 'text-emerald-700 bg-emerald-100',
-    Duathlon: 'text-amber-700 bg-amber-100',
+    Olympic:  'text-brand-800 bg-brand-100',
+    Sprint:   'text-emerald-700 bg-emerald-100',
+    Duathlon: 'text-finish-600 bg-finish-400/20',
   };
 
   return (
@@ -72,7 +72,7 @@ export default function RaceResults({ year, raceType, onBack, onSelectAthlete })
           Back
         </button>
         <div className="h-4 w-px bg-slate-200" />
-        <h2 className="text-xl font-bold text-slate-900">{year}</h2>
+        <h2 className="font-display text-2xl font-bold text-brand-900 tracking-tight">{year}</h2>
         <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-sm font-medium ${TYPE_COLOR[raceType] ?? 'text-slate-700 bg-slate-100'}`}>
           {raceType}
         </span>
@@ -114,7 +114,7 @@ export default function RaceResults({ year, raceType, onBack, onSelectAthlete })
             <div className="text-[11px] text-slate-400 uppercase tracking-wide mb-0.5">Winner</div>
             <button
               onClick={() => onSelectAthlete({ firstName: stats.winner.firstName, lastName: stats.winner.lastName })}
-              className="text-sm font-semibold text-slate-900 hover:text-brand-600 transition-colors text-left leading-tight"
+              className="font-display text-base font-semibold text-brand-900 hover:text-brand-600 transition-colors text-left leading-tight tracking-tight"
             >
               {stats.winner.fullName}
             </button>
@@ -122,35 +122,35 @@ export default function RaceResults({ year, raceType, onBack, onSelectAthlete })
           </div>
           <div className="rounded-lg bg-white border border-slate-200 px-3 py-2.5 shadow-sm">
             <div className="text-[11px] text-slate-400 uppercase tracking-wide mb-0.5">Finishers</div>
-            <div className="text-lg font-bold text-slate-900">{rows.length}</div>
+            <div className="font-display text-2xl font-bold text-brand-900">{rows.length}</div>
             <div className="text-[11px] text-slate-400">{stats.males}M · {stats.females}F</div>
           </div>
           <div className="rounded-lg bg-white border border-slate-200 px-3 py-2.5 shadow-sm">
             <div className="text-[11px] text-slate-400 uppercase tracking-wide mb-0.5">Median Time</div>
-            <div className="text-lg font-bold text-slate-900 tabular-nums">{formatSeconds(stats.median)}</div>
+            <div className="font-display text-2xl font-bold text-brand-900 tabular-nums">{formatSeconds(stats.median)}</div>
             <div className="text-[11px] text-slate-400">finish time</div>
           </div>
           <div className="rounded-lg bg-white border border-slate-200 px-3 py-2.5 shadow-sm">
             <div className="text-[11px] text-slate-400 uppercase tracking-wide mb-0.5">Avg Age</div>
-            <div className="text-lg font-bold text-slate-900">{stats.avgAge ?? '—'}</div>
+            <div className="font-display text-2xl font-bold text-brand-900">{stats.avgAge ?? '—'}</div>
             <div className="text-[11px] text-slate-400">{stats.states > 0 ? `${stats.states} states` : ''}</div>
           </div>
           {stats.fastSwim !== null && (
             <div className="rounded-lg bg-white border border-slate-200 px-3 py-2.5 shadow-sm">
               <div className="text-[11px] text-slate-400 uppercase tracking-wide mb-0.5">Fastest Swim</div>
-              <div className="text-lg font-bold text-slate-900 tabular-nums font-mono">{formatSeconds(stats.fastSwim)}</div>
+              <div className="font-display text-2xl font-bold text-brand-900 tabular-nums">{formatSeconds(stats.fastSwim)}</div>
             </div>
           )}
           {stats.fastBike !== null && (
             <div className="rounded-lg bg-white border border-slate-200 px-3 py-2.5 shadow-sm">
               <div className="text-[11px] text-slate-400 uppercase tracking-wide mb-0.5">Fastest Bike</div>
-              <div className="text-lg font-bold text-slate-900 tabular-nums font-mono">{formatSeconds(stats.fastBike)}</div>
+              <div className="font-display text-2xl font-bold text-brand-900 tabular-nums">{formatSeconds(stats.fastBike)}</div>
             </div>
           )}
           {stats.fastRun !== null && (
             <div className="rounded-lg bg-white border border-slate-200 px-3 py-2.5 shadow-sm">
               <div className="text-[11px] text-slate-400 uppercase tracking-wide mb-0.5">Fastest Run</div>
-              <div className="text-lg font-bold text-slate-900 tabular-nums font-mono">{formatSeconds(stats.fastRun)}</div>
+              <div className="font-display text-2xl font-bold text-brand-900 tabular-nums">{formatSeconds(stats.fastRun)}</div>
             </div>
           )}
         </div>

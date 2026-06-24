@@ -45,7 +45,7 @@ function RaceCard({ item, onViewRace }) {
             <div className="flex items-center gap-2.5">
               <button
                 onClick={() => onViewRace(item.year, item.raceType)}
-                className="text-xs text-brand-600 hover:text-brand-700 hover:underline"
+                className="text-xs font-medium text-brand-600 hover:text-brand-800 hover:underline"
               >
                 Results
               </button>
@@ -145,7 +145,7 @@ export default function YearBrowser({ status, onViewRace }) {
             await fetch('/api/scrape', { method: 'POST' });
             setTimeout(() => window.location.reload(), 2000);
           }}
-          className="mt-4 rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 transition-colors"
+          className="mt-4 rounded-lg bg-brand-800 px-4 py-2 text-sm font-medium text-white hover:bg-brand-900 transition-colors"
         >
           Load Results Now
         </button>
@@ -156,9 +156,9 @@ export default function YearBrowser({ status, onViewRace }) {
   return (
     <div className="space-y-4">
       <div className="flex items-baseline justify-between">
-        <h2 className="text-lg font-semibold text-slate-900">
+        <h2 className="font-display text-xl font-bold tracking-tight text-brand-900 uppercase">
           All Races
-          {status && <span className="ml-2 text-sm font-normal text-slate-400">({status.totalResults.toLocaleString()} finishers)</span>}
+          {status && <span className="ml-2 text-sm font-sans font-normal text-slate-400 normal-case tracking-normal">({status.totalResults.toLocaleString()} finishers)</span>}
         </h2>
       </div>
 
