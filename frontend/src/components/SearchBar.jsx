@@ -73,7 +73,7 @@ export default function SearchBar({ onSelect }) {
       </div>
 
       {open && results.length > 0 && (
-        <ul className="absolute z-20 mt-1 w-full rounded-xl border border-slate-200 bg-white shadow-lg overflow-hidden">
+        <ul className="absolute z-50 mt-1 w-full rounded-xl border border-slate-200 bg-white shadow-lg overflow-hidden">
           {results.map((athlete, i) => (
             <li key={i}>
               <button
@@ -98,7 +98,7 @@ export default function SearchBar({ onSelect }) {
       )}
 
       {open && !loading && query.trim().length >= 2 && results.length === 0 && (
-        <div className="absolute z-20 mt-1 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-lg text-sm text-slate-500">
+        <div className="absolute z-50 mt-1 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-lg text-sm text-slate-500">
           No athletes found matching "{query}"
         </div>
       )}

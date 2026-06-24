@@ -158,9 +158,9 @@ export default function App() {
           /* Home view */
           <div className="space-y-8">
             {/* Hero: bold finisher count statement */}
-            <div className="bg-brand-900 rounded-2xl px-8 py-10 text-white overflow-hidden relative">
+            <div className="bg-brand-900 rounded-2xl px-8 py-10 text-white relative">
               {/* Subtle texture: discipline letters anchored to bottom-right of the card */}
-              <div className="absolute bottom-0 right-0 flex gap-1 opacity-[0.08] select-none pointer-events-none" aria-hidden="true">
+              <div className="absolute bottom-0 right-0 flex gap-1 opacity-[0.08] select-none pointer-events-none overflow-hidden rounded-br-2xl" style={{height: '100%', maxWidth: '40%'}} aria-hidden="true">
                 <span className="font-display text-[130px] font-bold leading-none">S</span>
                 <span className="font-display text-[130px] font-bold leading-none">B</span>
                 <span className="font-display text-[130px] font-bold leading-none">R</span>
