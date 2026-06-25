@@ -17,8 +17,21 @@ cd frontend && npm run dev
 # Run the Python scraper (preferred — covers all historical sources)
 cd python_scraper && python scrape_all.py
 
+# After running the Python scraper, migrate results.json → griskus.db (required for the server to serve data)
+cd backend && npm run migrate
+
+# Force re-scrape all sources even if cached data exists
+cd python_scraper && python scrape_all.py --force
+
 # Trigger a rescrape via the API (uses the Node.js scrapers, not Python)
 curl -X POST http://localhost:3731/api/scrape
+```
+
+**Fresh checkout setup** (run in order):
+```bash
+cd python_scraper && python scrape_all.py   # populate results.json
+cd backend && npm run migrate               # populate griskus.db from results.json
+npm run dev                                 # server reads from griskus.db
 ```
 
 Port configuration: `BACKEND_PORT` controls the Express server. The Vite dev server auto-picks a free port (`port: 0`, `strictPort: false`) and reads `BACKEND_PORT` to configure the `/api` proxy. Override with `BACKEND_PORT=4200 npm run dev`.
@@ -27,11 +40,17 @@ Port configuration: `BACKEND_PORT` controls the Express server. The Vite dev ser
 
 **Monorepo with three independent pieces:**
 
-- `backend/` — Express REST API (ESM). Serves `results.json` through several endpoints. Data is cached in-memory after first load; `invalidateCache()` clears it.
+- `backend/` — Express REST API (ESM). Reads from `backend/data/griskus.db` (SQLite, WAL mode). Data is cached in-memory after first load; `invalidateCache()` clears it.
 - `frontend/` — React + Vite + Tailwind SPA. No router library; routing is done manually via `window.location.search` query params and `history.pushState`.
-- `python_scraper/` — The authoritative scraping tool. Writes directly to `backend/data/results.json`.
+- `python_scraper/` — The authoritative scraping tool. Writes to `backend/data/results.json`.
 
-**Data flow:** Python scraper → `backend/data/results.json` → Express API → React frontend. The Node.js scrapers (`backend/scrapers/`) cover the same sources but are less complete than the Python version.
+**Data flow:**
+```
+Python scraper → backend/data/results.json → (npm run migrate) → backend/data/griskus.db → Express API → React frontend
+```
+The Node.js scrapers (`backend/scrapers/`) write directly to the DB via `upsertBySource` and are triggered by `POST /api/scrape`. They cover fewer sources than the Python version.
+
+**`backend/scripts/migrate.js`** — bridges the Python scraper and the SQLite DB. Reads `results.json`, upserts all records into `griskus.db`, then runs a cross-source merge pass to collapse duplicate rows (same athlete, same race, times within 2 seconds). Safe to re-run. Use `npm run migrate:wipe` to drop and recreate the table.
 
 **Results record shape:**
 ```js
@@ -54,9 +73,13 @@ Times are strings in `H:MM:SS` or `MM:SS` format. The `useSort` hook in `fronten
 **Python scraper sources by year:**
 - 1999–2005: plattsys (static HTML)
 - 2006–2008: Wayback Machine (roadntracksports.com)
-- 2009–2016: Athlinks API (Sprint only — Olympic/Duathlon data for these years is not available)
+- 2009–2016: Athlinks API (Sprint only)
+- 2009–2014: FastTrack (Wayback Machine, Olympic only)
+- 2010–2016: USAT (Olympic/Duathlon — experimental)
 - 2017–2022: iResultsLive AJAX API
 - 2023–2025: RunSignup REST API
+
+Historical sources (plattsys, web_archive, athlinks, fasttrack) are cached — re-running the scraper skips them unless `--force` is passed. RunSignup always re-runs to pick up new race years.
 
 ## Skill routing
 
