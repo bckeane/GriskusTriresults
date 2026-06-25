@@ -5,12 +5,8 @@ columns: Place, No, Name, Age, S, City, St, Div/Tot, Div, [ranks and splits].
 """
 import re
 import time
-import requests
 from .normalizer import make_result
-
-HEADERS = {
-    'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
-}
+from .wayback import fetch_wayback
 
 RACES = [
     (2006, 'Olympic',
@@ -213,9 +209,7 @@ def parse_roadntrack(text, year, race_type):
 
 def fetch_and_parse(year, race_type, url):
     try:
-        r = requests.get(url, headers=HEADERS, timeout=25)
-        r.raise_for_status()
-        html = r.text
+        _, html = fetch_wayback(url)
         text = re.sub(r'<[^>]+>', '', html)
         text = re.sub(r'&amp;', '&', text)
         text = re.sub(r'&lt;', '<', text)
@@ -235,5 +229,5 @@ def scrape_web_archive():
     for year, race_type, url in RACES:
         rows = fetch_and_parse(year, race_type, url)
         all_results.extend(rows)
-        time.sleep(1.5)  # Be polite to archive.org
+        time.sleep(3)
     return all_results

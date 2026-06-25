@@ -4,13 +4,12 @@ iResultsLive scraper using the internal AJAX JSON API.
 The site renders results via /ajax/ajaxGetResults.php, which accepts:
   eventId, raceName, divName, gender, maxResults, startingPlace
 
-This is much simpler and more complete than Playwright scraping.
+Each year typically has two event IDs:
+  - A combined event (Olympic + Duathlon + satellite Sprint wave)
+  - A standalone Sprint event (larger Sprint-only field, race_name='Individual'/'Individuals'/'INDIVIDUAL')
+Both have zero overlap and must be scraped separately.
 
-Events and race names discovered by checking ?eid=XXXX event summary pages
-and testing each race name against the AJAX endpoint.
-
-Gap: 2018 Olympic not found on iResultsLive (not in known event IDs).
-     2021 Olympic/Duathlon not available (COVID-limited event).
+Events and race names discovered via /results/?eid=XXXX navigation HTML.
 """
 import time
 import requests
@@ -21,11 +20,24 @@ HEADERS = {'User-Agent': 'Mozilla/5.0 (compatible; GriskusScraper/1.0)'}
 
 # (year, eid, [(race_type_label, api_race_name), ...])
 EVENTS = [
+    # 2017: Olympic day (eid=2725) + standalone Sprint day (eid=2762)
     (2017, 2725, [('Olympic', 'OLYTRI'), ('Sprint', 'SPRINTTRI'), ('Duathlon', 'DU')]),
-    (2018, 3527, [('Sprint', 'SPRINT'), ('Duathlon', 'DUATHLON')]),
+    (2017, 2762, [('Sprint', 'Individual')]),
+
+    # 2018: Olympic day (eid=3527) + standalone Sprint day (eid=3575)
+    (2018, 3527, [('Olympic', 'OLYMPIC'), ('Sprint', 'SPRINT'), ('Duathlon', 'DUATHLON')]),
+    (2018, 3575, [('Sprint', 'Individuals')]),
+
+    # 2019: Combined day (eid=4270) + standalone Sprint day (eid=4323)
     (2019, 4270, [('Olympic', 'OLY'), ('Sprint', 'SPRINT'), ('Duathlon', 'OLYDUATHLON')]),
-    (2021, 5002, [('Sprint', 'SPRINTTRI')]),
+    (2019, 4323, [('Sprint', 'INDIVIDUAL')]),
+
+    # 2021: One combined event (COVID-limited field, but Olympic+Duathlon+Sprint all ran)
+    (2021, 5002, [('Olympic', 'OLYMPICTRI'), ('Duathlon', 'OLYMPICDU'), ('Sprint', 'SPRINTTRI')]),
+
+    # 2022: Combined day (eid=5295) + standalone Sprint day (eid=5316)
     (2022, 5295, [('Olympic', 'OLY'), ('Sprint', 'SPRINT'), ('Duathlon', 'DUATHLON')]),
+    (2022, 5316, [('Sprint', 'INDIVIDUAL')]),
 ]
 
 

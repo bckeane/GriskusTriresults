@@ -10,10 +10,20 @@ We pick OVERALL, skip relay courses, and paginate via `from` offset.
 Splits are fetched via the individual endpoint after collecting list results:
   GET /individual?eventId={eid}&eventCourseId={ecid}&bib={bib}&id=0
   Returns intervals[]: Swim, Transition, Bike/Cycle, Transition, Run, Full Course
+
+Splits are cached in python_scraper/cache/athlinks_splits.json so subsequent
+runs skip already-fetched athletes entirely.
 """
+import json
+import socket
 import time
 import requests
+from pathlib import Path
+
+socket.setdefaulttimeout(8)  # hard OS-level cap on all socket operations
 from .normalizer import make_result
+
+SPLITS_CACHE_FILE = Path(__file__).parent.parent / 'cache' / 'athlinks_splits.json'
 
 BASE_URL = 'https://results.athlinks.com/event/{event_id}'
 INDIVIDUAL_URL = 'https://results.athlinks.com/individual'
@@ -76,6 +86,23 @@ def pick_main_bracket(brackets):
     return max(candidates, key=lambda b: b.get('totalAthletes', 0))
 
 
+def load_splits_cache():
+    if SPLITS_CACHE_FILE.exists():
+        with open(SPLITS_CACHE_FILE) as f:
+            return json.load(f)
+    return {}
+
+
+def save_splits_cache(cache):
+    SPLITS_CACHE_FILE.parent.mkdir(parents=True, exist_ok=True)
+    with open(SPLITS_CACHE_FILE, 'w') as f:
+        json.dump(cache, f)
+
+
+def splits_cache_key(event_id, event_course_id, bib):
+    return f'{event_id}_{event_course_id}_{bib}'
+
+
 def fetch_splits(event_id, event_course_id, bib):
     """Fetch swim/bike/run splits for one athlete via the individual endpoint.
 
@@ -91,7 +118,7 @@ def fetch_splits(event_id, event_course_id, bib):
         'id': 0,
     }
     try:
-        r = requests.get(INDIVIDUAL_URL, params=params, headers=HEADERS, timeout=15)
+        r = requests.get(INDIVIDUAL_URL, params=params, headers=HEADERS, timeout=(5, 8))
         r.raise_for_status()
         data = r.json()
     except Exception:
@@ -121,7 +148,7 @@ def fetch_splits(event_id, event_course_id, bib):
     return splits
 
 
-def fetch_event_results(year, event_id, event_course_id):
+def fetch_event_results(year, event_id, event_course_id, splits_cache, skip_splits=False):
     url = BASE_URL.format(event_id=event_id)
     all_rows = []
     total = None
@@ -199,17 +226,42 @@ def fetch_event_results(year, event_id, event_course_id):
             })
 
         from_idx += len(results)
+        if len(results) < 100:  # partial page = end of results
+            break
         if total and from_idx >= total:
             break
         time.sleep(2.0)
 
-    # Enrich with individual splits
-    print(f'    Fetching splits for {len(all_rows)} athletes...')
+    # Enrich with individual splits, using cache to skip already-fetched athletes
+    if not skip_splits:
+        need_fetch = [(i, e) for i, e in enumerate(all_rows)
+                      if splits_cache_key(e['_meta']['event_id'], e['_meta']['ecid'], e['_meta']['bib']) not in splits_cache]
+        cached_count = len(all_rows) - len(need_fetch)
+        if cached_count:
+            print(f'    {cached_count}/{len(all_rows)} splits from cache, fetching {len(need_fetch)} new...')
+        else:
+            print(f'    Fetching splits for {len(all_rows)} athletes...')
+
+        for i, (orig_idx, entry) in enumerate(need_fetch):
+            meta = entry['_meta']
+            key = splits_cache_key(meta['event_id'], meta['ecid'], meta['bib'])
+            splits = fetch_splits(meta['event_id'], meta['ecid'], meta['bib'])
+            if splits:  # only cache successful fetches; empty = timeout/error, retry next run
+                splits_cache[key] = splits
+            if (i + 1) % 50 == 0:
+                print(f'      {i + 1}/{len(need_fetch)} splits fetched')
+                save_splits_cache(splits_cache)
+            time.sleep(0.15)
+
+        if need_fetch:
+            save_splits_cache(splits_cache)
+
     enriched = []
-    for i, entry in enumerate(all_rows):
+    for entry in all_rows:
         meta = entry['_meta']
         row = entry['row']
-        splits = fetch_splits(meta['event_id'], meta['ecid'], meta['bib'])
+        key = splits_cache_key(meta['event_id'], meta['ecid'], meta['bib'])
+        splits = splits_cache.get(key, {})
         if splits:
             row = dict(row)
             if splits.get('swim'):
@@ -219,19 +271,21 @@ def fetch_event_results(year, event_id, event_course_id):
             if splits.get('run'):
                 row['runTime'] = splits['run']
         enriched.append(row)
-        if (i + 1) % 50 == 0:
-            print(f'      {i + 1}/{len(all_rows)} splits fetched')
-        time.sleep(0.15)
 
     return enriched
 
 
-def scrape_athlinks():
+def scrape_athlinks(skip_splits=False):
     print('Scraping Athlinks API (2009–2016 Sprint)...')
+    splits_cache = load_splits_cache()
+    if splits_cache:
+        print(f'  Loaded {len(splits_cache)} cached splits')
+    if skip_splits:
+        print('  (split fetching disabled — using cache only)')
     all_results = []
     for year, event_id, event_course_id in EVENTS:
         try:
-            rows = fetch_event_results(year, event_id, event_course_id)
+            rows = fetch_event_results(year, event_id, event_course_id, splits_cache, skip_splits=skip_splits)
             print(f'  {year} Sprint: {len(rows)} results')
             all_results.extend(rows)
         except Exception as e:
