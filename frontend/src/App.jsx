@@ -107,15 +107,10 @@ export default function App() {
                 Pat Griskus
               </div>
               <div className="font-display text-xs font-500 tracking-[0.2em] text-slate-400 uppercase mt-0.5">
-                Triathlon · Waterbury CT
+                Triathlon · Middlebury CT
               </div>
             </button>
             <div className="flex items-center gap-3">
-              {isHome && (
-                <div className="hidden sm:block">
-                  <SearchBar onSelect={handleSelectAthlete} />
-                </div>
-              )}
               <button
                 onClick={handleViewStats}
                 className="text-sm text-slate-500 hover:text-brand-700 transition-colors whitespace-nowrap font-medium"
@@ -159,12 +154,10 @@ export default function App() {
           <div className="space-y-8">
             {/* Hero: bold finisher count statement */}
             <div className="bg-brand-900 rounded-2xl px-8 py-10 text-white relative">
-              {/* Subtle texture: discipline letters anchored to bottom-right of the card */}
-              <div className="absolute bottom-0 right-0 flex gap-1 opacity-[0.08] select-none pointer-events-none overflow-hidden rounded-br-2xl" style={{height: '100%', maxWidth: '40%'}} aria-hidden="true">
-                <span className="font-display text-[130px] font-bold leading-none">S</span>
-                <span className="font-display text-[130px] font-bold leading-none">B</span>
-                <span className="font-display text-[130px] font-bold leading-none">R</span>
-              </div>
+              {/* Lake Quassapaug outline — the race venue, ghosted into the card */}
+              <svg aria-hidden="true" viewBox="0 0 207 300" className="absolute inset-y-4 right-6 h-[calc(100%-2rem)] w-auto max-w-[45%] select-none pointer-events-none opacity-20" preserveAspectRatio="xMaxYMid meet">
+                <path d="M 10.00,160.79 L 22.79,195.24 L 41.06,202.06 L 59.84,220.81 L 73.49,225.19 L 78.23,258.18 L 69.98,275.38 L 55.82,285.63 L 70.68,288.20 L 83.96,277.53 L 89.53,261.52 L 91.69,273.39 L 99.76,286.50 L 113.60,281.19 L 119.22,273.13 L 136.75,262.59 L 144.21,253.86 L 154.44,244.32 L 156.45,247.42 L 160.20,248.25 L 158.80,244.41 L 161.87,236.52 L 163.65,222.76 L 165.09,213.77 L 175.68,206.34 L 180.39,198.75 L 182.67,191.26 L 184.13,178.68 L 182.54,156.41 L 179.72,142.07 L 178.28,137.77 L 168.87,130.11 L 161.97,123.27 L 159.73,117.96 L 157.13,114.99 L 157.27,109.30 L 154.92,101.52 L 157.25,95.64 L 158.73,83.04 L 156.54,75.95 L 156.87,67.43 L 155.96,59.09 L 153.99,51.79 L 151.16,34.99 L 148.64,14.34 L 135.42,13.19 L 125.81,27.28 L 114.85,33.89 L 123.91,43.02 L 132.86,51.18 L 140.90,68.02 L 141.16,76.42 L 133.86,93.01 L 140.30,99.38 L 137.19,114.42 L 139.28,118.33 L 141.71,129.48 L 141.15,136.20 L 138.62,142.78 L 135.35,145.12 L 130.56,146.31 L 126.78,147.09 L 120.70,145.88 L 115.62,145.54 L 108.20,148.50 L 95.22,147.53 L 88.13,147.91 L 87.74,143.61 L 85.00,137.06 L 81.29,126.83 L 77.69,120.95 L 79.12,141.36 L 74.20,152.14 L 69.39,151.24 L 61.79,158.81 L 58.70,167.02 L 51.41,180.97 L 41.88,187.34 L 37.82,151.31 L 56.93,96.61 L 51.83,75.82 L 34.09,130.89 L 10.64,158.09 L 10.00,160.79 Z" fill="white" fillOpacity="0.15" stroke="white" strokeWidth="3" strokeLinejoin="round" />
+              </svg>
               <div className="relative">
                 <div className="font-display text-[72px] sm:text-[96px] font-bold leading-none text-white tracking-tight">
                   {totalResults ? totalResults.toLocaleString() : '—'}
@@ -173,7 +166,7 @@ export default function App() {
                   Finisher records
                 </div>
                 <div className="mt-6 text-brand-200 text-sm">
-                  {yearRange ? `${yearRange.min}–${yearRange.max}` : '1999–2025'} · Waterbury, Connecticut
+                  {yearRange ? `${yearRange.min}–${yearRange.max}` : '1999–2025'} · Middlebury, Connecticut
                 </div>
                 <div className="mt-5 sm:hidden">
                   <SearchBar onSelect={handleSelectAthlete} />

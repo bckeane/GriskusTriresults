@@ -1,6 +1,8 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useSort } from '../hooks/useSort.js';
 import { parseTimeSeconds, formatSeconds } from '../utils/time.js';
+import { computeTriScore } from '../utils/pace.js';
+import { TriScorePopover } from './AthleteView.jsx';
 
 const COLUMNS = [
   { key: 'place',     label: '#',        align: 'left'  },
@@ -12,6 +14,7 @@ const COLUMNS = [
   { key: 'swimTime',  label: 'Swim',     align: 'right' },
   { key: 'bikeTime',  label: 'Bike',     align: 'right' },
   { key: 'runTime',   label: 'Run',      align: 'right' },
+  { key: 'triScore',  label: 'Score',    align: 'right', title: 'TriScore: 0–100 composite of place + pace percentile. Hover for breakdown.' },
 ];
 
 export default function RaceResults({ year, raceType, onBack, onSelectAthlete }) {
@@ -23,7 +26,14 @@ export default function RaceResults({ year, raceType, onBack, onSelectAthlete })
     setLoading(true);
     fetch(`/api/results?year=${year}&raceType=${encodeURIComponent(raceType)}&limit=10000`)
       .then(r => r.json())
-      .then(d => setRows(d.results))
+      .then(d => {
+        const raw = d.results ?? [];
+        const scored = raw.map(r => {
+          const ts = computeTriScore(r, raw);
+          return ts != null ? { ...r, triScore: ts.score, triScoreData: ts } : r;
+        });
+        setRows(scored);
+      })
       .catch(() => setRows([]))
       .finally(() => setLoading(false));
   }, [year, raceType]);
@@ -174,6 +184,7 @@ export default function RaceResults({ year, raceType, onBack, onSelectAthlete })
                 {COLUMNS.map(col => (
                   <th
                     key={col.key}
+                    title={col.title}
                     className={`px-3 py-2.5 font-medium cursor-pointer select-none hover:text-slate-800 whitespace-nowrap ${col.align === 'right' ? 'text-right' : 'text-left'}`}
                     onClick={() => toggle(col.key)}
                   >
@@ -205,6 +216,7 @@ export default function RaceResults({ year, raceType, onBack, onSelectAthlete })
                   <td className="px-3 py-2.5 text-right font-mono text-xs text-slate-500 tabular-nums">{r.swimTime ?? '—'}</td>
                   <td className="px-3 py-2.5 text-right font-mono text-xs text-slate-500 tabular-nums">{r.bikeTime ?? '—'}</td>
                   <td className="px-3 py-2.5 text-right font-mono text-xs text-slate-500 tabular-nums">{r.runTime ?? '—'}</td>
+                  <TriScorePopover result={r} ts={r.triScoreData} anchor="right" tdCls="px-3 py-2.5 text-right text-xs tabular-nums" />
                 </tr>
               ))}
             </tbody>
