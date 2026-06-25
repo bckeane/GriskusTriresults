@@ -1,27 +1,27 @@
 import express from 'express';
 import cors from 'cors';
-import { loadResults, searchAthletes, getAthleteResults, getYearSummary, annotateWithDivisionRank, invalidateCache } from './data.js';
+import { loadResults, queryResults, getRaceField, getAthleteResultsFromDb, upsertBySource, searchAthletes, getYearSummary, getDemographics, annotateWithDivisionRank, annotateWithTriScore, invalidateCache } from './data.js';
 import { runFullScrape } from './scrapers/index.js';
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 
-// All results with optional filters
-app.get('/api/results', async (req, res) => {
-  const results = await loadResults();
-  let filtered = results;
-
+// All results with optional filters — filtering pushed to SQLite
+app.get('/api/results', (req, res) => {
   const { year, raceType, limit = 100, offset = 0 } = req.query;
-  if (year) filtered = filtered.filter(r => r.year === parseInt(year, 10));
-  if (raceType) filtered = filtered.filter(r => r.raceType.toLowerCase() === raceType.toLowerCase());
-
-  res.json({
-    total: filtered.length,
-    offset: +offset,
-    limit: +limit,
-    results: filtered.slice(+offset, +offset + +limit),
+  const { total, results } = queryResults({
+    year:     year     ? parseInt(year, 10) : undefined,
+    raceType: raceType || undefined,
+    limit:    +limit,
+    offset:   +offset,
   });
+  res.json({ total, offset: +offset, limit: +limit, results });
+});
+
+// Demographics: gender splits and age group counts per year+raceType
+app.get('/api/demographics', (req, res) => {
+  res.json(getDemographics());
 });
 
 // Year/race summary
@@ -42,24 +42,24 @@ app.get('/api/athletes/search', async (req, res) => {
 });
 
 // Get all results for a specific athlete
-app.get('/api/athletes/:lastName/:firstName', async (req, res) => {
+app.get('/api/athletes/:lastName/:firstName', (req, res) => {
   const { lastName, firstName } = req.params;
-  const results = await loadResults();
-  const athleteResults = getAthleteResults(results, firstName, lastName);
+  const athleteResults = getAthleteResultsFromDb(firstName, lastName);
   if (!athleteResults.length) {
     return res.status(404).json({ error: 'No results found for this athlete' });
   }
 
-  // Annotate each result with divRank/divTotal by computing rank within the full race field.
+  // Annotate each result with divRank/divTotal then triScore by fetching only the relevant race fields.
   const raceKeys = [...new Set(athleteResults.map(r => `${r.year}|${r.raceType}`))];
   const raceFieldMap = new Map();
   for (const key of raceKeys) {
     const [year, raceType] = key.split('|');
-    const field = results.filter(r => r.year === parseInt(year, 10) && r.raceType === raceType);
-    raceFieldMap.set(key, annotateWithDivisionRank(field));
+    const field = getRaceField(parseInt(year, 10), raceType);
+    const withDiv = annotateWithDivisionRank(field);
+    raceFieldMap.set(key, annotateWithTriScore(withDiv));
   }
 
-  // Look up each athlete result in the annotated field to get its rank.
+  // Look up each athlete result in the annotated field to get its rank and score.
   const annotated = athleteResults.map(r => {
     const key = `${r.year}|${r.raceType}`;
     const field = raceFieldMap.get(key) || [];
@@ -69,7 +69,9 @@ app.get('/api/athletes/:lastName/:firstName', async (req, res) => {
     ) || field.find(f =>
       f.firstName === r.firstName && f.lastName === r.lastName && f.totalTime === r.totalTime
     );
-    return match ? { ...r, divRank: match.divRank, divTotal: match.divTotal } : { ...r, divRank: null, divTotal: null };
+    return match
+      ? { ...r, divRank: match.divRank, divTotal: match.divTotal, triScore: match.triScore ?? null }
+      : { ...r, divRank: null, divTotal: null, triScore: null };
   });
 
   res.json({

@@ -1,28 +1,134 @@
-import { readFile, writeFile } from 'fs/promises';
+import { createRequire } from 'module';
 import { existsSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
+import { parseSeconds, formatSeconds } from './time.js';
+
+const require = createRequire(import.meta.url);
+const Database = require('better-sqlite3');
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const DATA_FILE = join(__dirname, 'data', 'results.json');
+const DB_FILE = join(__dirname, 'data', 'griskus.db');
 
+let db = null;
 let cache = null;
 
-export async function loadResults() {
-  if (cache) return cache;
-  if (!existsSync(DATA_FILE)) return [];
-  try {
-    const raw = await readFile(DATA_FILE, 'utf-8');
-    cache = JSON.parse(raw);
-    return cache;
-  } catch {
-    return [];
-  }
+function getDb() {
+  if (db) return db;
+  if (!existsSync(DB_FILE)) return null;
+  db = new Database(DB_FILE);
+  db.pragma('journal_mode = WAL');
+  return db;
 }
 
-export async function saveResults(results) {
-  cache = results;
-  await writeFile(DATA_FILE, JSON.stringify(results, null, 2), 'utf-8');
+export function loadResults() {
+  if (cache) return cache;
+  const conn = getDb();
+  if (!conn) return [];
+  cache = conn.prepare('SELECT * FROM results ORDER BY year, raceType, place').all();
+  return cache;
+}
+
+// Filtered query pushed to SQLite — avoids loading the full table for filtered endpoints.
+// filters: { year?, raceType?, limit?, offset? }
+export function queryResults({ year, raceType, limit = 100, offset = 0 } = {}) {
+  const conn = getDb();
+  if (!conn) return { total: 0, results: [] };
+
+  const where = [];
+  const params = [];
+  if (year != null) { where.push('year = ?'); params.push(year); }
+  if (raceType != null) { where.push('raceType = ? COLLATE NOCASE'); params.push(raceType); }
+  const whereClause = where.length ? `WHERE ${where.join(' AND ')}` : '';
+
+  const total = conn.prepare(`SELECT COUNT(*) AS n FROM results ${whereClause}`).get(...params).n;
+  const results = conn.prepare(
+    `SELECT * FROM results ${whereClause} ORDER BY place, totalTime LIMIT ? OFFSET ?`
+  ).all(...params, limit, offset);
+
+  return { total, results };
+}
+
+// Fetch the full field for one race (year + raceType) — used for per-race annotations.
+export function getRaceField(year, raceType) {
+  const conn = getDb();
+  if (!conn) return [];
+  return conn.prepare(
+    'SELECT * FROM results WHERE year = ? AND raceType = ? COLLATE NOCASE ORDER BY place, totalTime'
+  ).all(year, raceType);
+}
+
+// Upsert all records for a given source, leaving other sources untouched.
+// This replaces the old saveResults() full-overwrite for scraper use.
+export function upsertBySource(source, records) {
+  const conn = getDb() ?? openDb();
+  const del = conn.prepare('DELETE FROM results WHERE source = ?');
+  const ins = conn.prepare(`
+    INSERT OR REPLACE INTO results
+      (year, raceType, source, place, firstName, lastName, fullName,
+       city, state, age, gender, division, divPlace, totalTime, swimTime, bikeTime, runTime, bib)
+    VALUES
+      (@year, @raceType, @source, @place, @firstName, @lastName, @fullName,
+       @city, @state, @age, @gender, @division, @divPlace, @totalTime, @swimTime, @bikeTime, @runTime, @bib)
+  `);
+  conn.transaction(() => {
+    del.run(source);
+    for (const r of records) {
+      ins.run({
+        year:      r.year      ?? null,
+        raceType:  r.raceType  ?? null,
+        source:    source,
+        place:     r.place     ?? null,
+        firstName: r.firstName ?? null,
+        lastName:  r.lastName  ?? null,
+        fullName:  r.fullName  ?? null,
+        city:      r.city      ?? null,
+        state:     r.state     ?? null,
+        age:       r.age       ?? null,
+        gender:    r.gender    ?? null,
+        division:  r.division  ?? null,
+        divPlace:  r.divPlace  ?? null,
+        totalTime: r.totalTime ?? null,
+        swimTime:  r.swimTime  ?? null,
+        bikeTime:  r.bikeTime  ?? null,
+        runTime:   r.runTime   ?? null,
+        bib:       r.bib       ?? null,
+      });
+    }
+  })();
+  invalidateCache();
+}
+
+function openDb() {
+  db = new Database(DB_FILE);
+  db.pragma('journal_mode = WAL');
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS results (
+      id        INTEGER PRIMARY KEY,
+      year      INTEGER NOT NULL,
+      raceType  TEXT    NOT NULL,
+      source    TEXT,
+      place     INTEGER,
+      firstName TEXT,
+      lastName  TEXT,
+      fullName  TEXT,
+      city      TEXT,
+      state     TEXT,
+      age       INTEGER,
+      gender    TEXT,
+      division  TEXT,
+      divPlace  INTEGER,
+      totalTime TEXT,
+      swimTime  TEXT,
+      bikeTime  TEXT,
+      runTime   TEXT,
+      bib       TEXT,
+      UNIQUE(year, raceType, fullName, totalTime)
+    )
+  `);
+  db.exec('CREATE INDEX IF NOT EXISTS idx_year_racetype ON results (year, raceType)');
+  db.exec('CREATE INDEX IF NOT EXISTS idx_name ON results (lastName, firstName)');
+  return db;
 }
 
 export function invalidateCache() {
@@ -61,7 +167,6 @@ export function searchAthletes(results, query) {
                  a.lastName.toLowerCase().includes(q) ||
                  a.firstName.toLowerCase().includes(q))
     .sort((a, b) => {
-      // Exact last name match first
       const aLast = a.lastName.toLowerCase() === q;
       const bLast = b.lastName.toLowerCase() === q;
       if (aLast && !bLast) return -1;
@@ -79,8 +184,108 @@ export function getAthleteResults(results, firstName, lastName) {
     .sort((a, b) => a.year - b.year || a.raceType.localeCompare(b.raceType));
 }
 
-// Normalize division strings to a canonical form like "M4044", or null if not an age-group division.
-// Handles: M4044, M 40-44, M40-44, DU-M4044, DU-F 35-39, etc.
+// Direct DB lookup for one athlete — avoids loading the full table.
+export function getAthleteResultsFromDb(firstName, lastName) {
+  const conn = getDb();
+  if (!conn) return [];
+  return conn.prepare(
+    `SELECT * FROM results WHERE firstName = ? COLLATE NOCASE AND lastName = ? COLLATE NOCASE
+     ORDER BY year, raceType`
+  ).all(firstName, lastName);
+}
+
+// Course distances used for TriScore pace computation
+const DISTANCES = {
+  Sprint:   { swimYards: 820,   bikeMiles: 12.43, runMiles: 3.107 },
+  Olympic:  { swimYards: 1640,  bikeMiles: 24.85, runMiles: 6.214 },
+  Duathlon: { swimYards: 0,     bikeMiles: 24.85, runMiles: 6.214 },
+};
+
+function percentileScore(myValue, allValues, higherIsBetter) {
+  if (!allValues.length) return null;
+  const iBeaten = allValues.filter(v => higherIsBetter ? v < myValue : v > myValue).length;
+  return (iBeaten / allValues.length) * 100;
+}
+
+function computeTriScore(result, fieldResults) {
+  const { place, swimTime, bikeTime, runTime, raceType, divRank, divTotal } = result;
+  const isDuathlon = raceType === 'Duathlon';
+  const dist = DISTANCES[raceType];
+  if (!dist) return null;
+
+  const fieldWithPlace = fieldResults.filter(r => r.place != null);
+  let placeScore = null;
+  if (place != null && fieldWithPlace.length >= 1) {
+    placeScore = fieldWithPlace.length === 1
+      ? 100
+      : Math.max(0, Math.min(100,
+          ((fieldWithPlace.length - place) / (fieldWithPlace.length - 1)) * 100
+        ));
+  }
+
+  let agScore = null;
+  if (divRank != null && divTotal != null && divTotal > 1) {
+    agScore = Math.max(0, Math.min(100,
+      ((divTotal - divRank) / (divTotal - 1)) * 100
+    ));
+  }
+
+  const swimSecs = parseSeconds(swimTime);
+  const bikeSecs = parseSeconds(bikeTime);
+  const runSecs  = parseSeconds(runTime);
+  const hasSplits = swimSecs != null || bikeSecs != null || runSecs != null;
+
+  let paceScore = null;
+  if (hasSplits) {
+    const weighted = [];
+    if (!isDuathlon && swimSecs != null && dist.swimYards) {
+      const myPace = (swimSecs / dist.swimYards) * 100;
+      const fieldPaces = fieldResults
+        .map(r => { const s = parseSeconds(r.swimTime); return s ? (s / dist.swimYards) * 100 : null; })
+        .filter(v => v != null);
+      if (fieldPaces.length > 1) {
+        const s = percentileScore(myPace, fieldPaces, false);
+        if (s != null) weighted.push({ s, w: 0.25 });
+      }
+    }
+    if (bikeSecs != null) {
+      const myMPH = (dist.bikeMiles / bikeSecs) * 3600;
+      const fieldMPHs = fieldResults
+        .map(r => { const s = parseSeconds(r.bikeTime); return s ? (dist.bikeMiles / s) * 3600 : null; })
+        .filter(v => v != null);
+      if (fieldMPHs.length > 1) {
+        const s = percentileScore(myMPH, fieldMPHs, true);
+        if (s != null) weighted.push({ s, w: isDuathlon ? 0.6 : 0.5 });
+      }
+    }
+    if (runSecs != null) {
+      const myPace = runSecs / dist.runMiles;
+      const fieldPaces = fieldResults
+        .map(r => { const s = parseSeconds(r.runTime); return s ? s / dist.runMiles : null; })
+        .filter(v => v != null);
+      if (fieldPaces.length > 1) {
+        const s = percentileScore(myPace, fieldPaces, false);
+        if (s != null) weighted.push({ s, w: isDuathlon ? 0.4 : 0.25 });
+      }
+    }
+    if (weighted.length > 0) {
+      const totalW = weighted.reduce((sum, x) => sum + x.w, 0);
+      paceScore = weighted.reduce((sum, x) => sum + x.s * (x.w / totalW), 0);
+    }
+  }
+
+  if (placeScore == null && paceScore == null) return null;
+  const agRounded = agScore != null ? Math.round(agScore) : null;
+  if (placeScore == null) return { score: Math.round(paceScore), paceOnly: true, agScore: agRounded };
+  if (paceScore == null) return { score: Math.round(placeScore), placeOnly: true, agScore: agRounded };
+  return {
+    score: Math.round(0.5 * placeScore + 0.5 * paceScore),
+    placeScore: Math.round(placeScore),
+    paceScore: Math.round(paceScore),
+    agScore: agRounded,
+  };
+}
+
 const AGE_GROUP_RE = /^(?:DU-)?([MF])[\s-]?(\d{2})[\s-]?(\d{2})$/;
 function normalizeDivision(div) {
   if (!div) return null;
@@ -89,11 +294,7 @@ function normalizeDivision(div) {
   return `${m[1]}${m[2]}${m[3]}`;
 }
 
-// Given all results for a race (same year+raceType), annotate each result with
-// divRank (1-based place within their normalized division) and divTotal (field size).
-// Results with no parseable division get divRank/divTotal = null.
 export function annotateWithDivisionRank(raceResults) {
-  // Group by normalized division
   const groups = new Map();
   for (const r of raceResults) {
     const div = normalizeDivision(r.division);
@@ -102,8 +303,7 @@ export function annotateWithDivisionRank(raceResults) {
     groups.get(div).push(r);
   }
 
-  // Sort each group by totalTime (nulls last), assign rank
-  const rankMap = new Map(); // result object → { divRank, divTotal }
+  const rankMap = new Map();
   for (const [, group] of groups) {
     const sorted = [...group].sort((a, b) => {
       const as = parseSeconds(a.totalTime), bs = parseSeconds(b.totalTime);
@@ -122,23 +322,13 @@ export function annotateWithDivisionRank(raceResults) {
   });
 }
 
-function parseSeconds(t) {
-  if (!t) return null;
-  const parts = t.split(':').map(Number);
-  if (parts.some(isNaN)) return null;
-  if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
-  if (parts.length === 2) return parts[0] * 60 + parts[1];
-  return null;
+export function annotateWithTriScore(raceResults) {
+  return raceResults.map(r => {
+    const ts = computeTriScore(r, raceResults);
+    return ts != null ? { ...r, triScore: ts } : r;
+  });
 }
 
-function formatSeconds(s) {
-  if (s == null) return null;
-  const h = Math.floor(s / 3600);
-  const m = Math.floor((s % 3600) / 60);
-  const sec = Math.round(s % 60);
-  if (h > 0) return `${h}:${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
-  return `${m}:${String(sec).padStart(2, '0')}`;
-}
 
 function statsFor(times) {
   if (times.length === 0) return { min: null, max: null, avg: null, median: null };
@@ -151,6 +341,43 @@ function statsFor(times) {
     ? Math.round((times[mid - 1] + times[mid]) / 2)
     : times[mid]);
   return { min, max, avg, median };
+}
+
+// Age bracket label for a given age (decade buckets, under-20 grouped).
+function ageBracket(age) {
+  if (age == null || age < 1) return null;
+  if (age < 20) return 'U20';
+  const decade = Math.floor(age / 10) * 10;
+  return `${decade}s`;
+}
+
+// Returns per-year+raceType gender splits and age group counts.
+// Shape: [{ year, raceType, male, female, other, ageGroups: { U20, '20s', '30s', ... } }]
+export function getDemographics() {
+  const conn = getDb();
+  if (!conn) return [];
+
+  const rows = conn.prepare(
+    'SELECT year, raceType, gender, age FROM results ORDER BY year, raceType'
+  ).all();
+
+  const map = new Map();
+  for (const r of rows) {
+    const key = `${r.year}|${r.raceType}`;
+    if (!map.has(key)) {
+      map.set(key, { year: r.year, raceType: r.raceType, male: 0, female: 0, other: 0, ageGroups: {} });
+    }
+    const entry = map.get(key);
+    const g = r.gender?.toUpperCase();
+    if (g === 'M') entry.male++;
+    else if (g === 'F') entry.female++;
+    else if (g) entry.other++;
+
+    const bracket = ageBracket(r.age);
+    if (bracket) entry.ageGroups[bracket] = (entry.ageGroups[bracket] ?? 0) + 1;
+  }
+
+  return [...map.values()].sort((a, b) => b.year - a.year || a.raceType.localeCompare(b.raceType));
 }
 
 export function getYearSummary(results) {
@@ -174,7 +401,6 @@ export function getYearSummary(results) {
   return [...map.values()].map(({ total, swim, bike, run, ...entry }) => ({
     ...entry,
     ...statsFor(total),
-    // Legacy field names kept for backwards compat
     best: total.length ? formatSeconds(Math.min(...total)) : null,
     disciplines: {
       swim: statsFor(swim),
