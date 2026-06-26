@@ -22,7 +22,7 @@ export function loadResults() {
   if (cache) return cache;
   const conn = getDb();
   if (!conn) return [];
-  cache = conn.prepare('SELECT * FROM results ORDER BY year, raceType, place').all();
+  cache = conn.prepare('SELECT * FROM results WHERE year != 2020 ORDER BY year, raceType, place').all();
   return cache;
 }
 
@@ -32,11 +32,11 @@ export function queryResults({ year, raceType, limit = 100, offset = 0 } = {}) {
   const conn = getDb();
   if (!conn) return { total: 0, results: [] };
 
-  const where = [];
+  const where = ['year != 2020'];
   const params = [];
   if (year != null) { where.push('year = ?'); params.push(year); }
   if (raceType != null) { where.push('raceType = ? COLLATE NOCASE'); params.push(raceType); }
-  const whereClause = where.length ? `WHERE ${where.join(' AND ')}` : '';
+  const whereClause = `WHERE ${where.join(' AND ')}`;
 
   const total = conn.prepare(`SELECT COUNT(*) AS n FROM results ${whereClause}`).get(...params).n;
   const results = conn.prepare(
@@ -191,7 +191,7 @@ export function getAthleteResultsFromDb(firstName, lastName) {
   const conn = getDb();
   if (!conn) return [];
   return conn.prepare(
-    `SELECT * FROM results WHERE firstName = ? COLLATE NOCASE AND lastName = ? COLLATE NOCASE
+    `SELECT * FROM results WHERE year != 2020 AND firstName = ? COLLATE NOCASE AND lastName = ? COLLATE NOCASE
      ORDER BY year, raceType`
   ).all(firstName, lastName);
 }
@@ -360,7 +360,7 @@ export function getDemographics() {
   if (!conn) return [];
 
   const rows = conn.prepare(
-    'SELECT year, raceType, gender, age FROM results ORDER BY year, raceType'
+    'SELECT year, raceType, gender, age FROM results WHERE year != 2020 ORDER BY year, raceType'
   ).all();
 
   const map = new Map();
