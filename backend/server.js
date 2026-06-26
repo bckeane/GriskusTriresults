@@ -1,14 +1,30 @@
 import express from 'express';
 import cors from 'cors';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import { loadResults, queryResults, getRaceField, getAthleteResultsFromDb, upsertBySource, searchAthletes, getYearSummary, getDemographics, annotateWithDivisionRank, annotateWithTriScore, invalidateCache } from './data.js';
 import { runFullScrape } from './scrapers/index.js';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+// Sub-path where the app is mounted (e.g. '/griskus' on ctkeane.com/griskus).
+// Reads PASSENGER_BASE_URI set by cPanel; falls back to '/griskus' in production, empty in dev.
+const rawBase = (process.env.APP_BASE_PATH ?? process.env.PASSENGER_BASE_URI ?? '').replace(/^\/|\/$/g, '');
+const basePath = rawBase ? `/${rawBase}` : (process.env.NODE_ENV === 'production' ? '/griskus' : '');
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 
+// In production Passenger manages the socket; serve the built React app from backend.
+if (process.env.NODE_ENV === 'production') {
+  const distDir = path.join(__dirname, '..', 'frontend', 'dist');
+  if (basePath) app.use(basePath, express.static(distDir));
+  app.use(express.static(distDir));
+}
+
 // All results with optional filters — filtering pushed to SQLite
-app.get('/api/results', (req, res) => {
+app.get(`${basePath}/api/results`, (req, res) => {
   const { year, raceType, limit = 100, offset = 0 } = req.query;
   const { total, results } = queryResults({
     year:     year     ? parseInt(year, 10) : undefined,
@@ -20,18 +36,18 @@ app.get('/api/results', (req, res) => {
 });
 
 // Demographics: gender splits and age group counts per year+raceType
-app.get('/api/demographics', (req, res) => {
+app.get(`${basePath}/api/demographics`, (req, res) => {
   res.json(getDemographics());
 });
 
 // Year/race summary
-app.get('/api/summary', async (req, res) => {
+app.get(`${basePath}/api/summary`, async (req, res) => {
   const results = await loadResults();
   res.json(getYearSummary(results));
 });
 
 // Search athletes by name
-app.get('/api/athletes/search', async (req, res) => {
+app.get(`${basePath}/api/athletes/search`, async (req, res) => {
   const { q } = req.query;
   if (!q || q.trim().length < 2) {
     return res.status(400).json({ error: 'Query must be at least 2 characters' });
@@ -42,7 +58,7 @@ app.get('/api/athletes/search', async (req, res) => {
 });
 
 // Get all results for a specific athlete
-app.get('/api/athletes/:lastName/:firstName', (req, res) => {
+app.get(`${basePath}/api/athletes/:lastName/:firstName`, (req, res) => {
   const { lastName, firstName } = req.params;
   const athleteResults = getAthleteResultsFromDb(firstName, lastName);
   if (!athleteResults.length) {
@@ -83,7 +99,7 @@ app.get('/api/athletes/:lastName/:firstName', (req, res) => {
 });
 
 // Trigger a fresh scrape
-app.post('/api/scrape', async (req, res) => {
+app.post(`${basePath}/api/scrape`, async (req, res) => {
   invalidateCache();
   res.json({ status: 'started', message: 'Scraping in progress...' });
   try {
@@ -95,7 +111,7 @@ app.post('/api/scrape', async (req, res) => {
 });
 
 // Data health check
-app.get('/api/status', async (req, res) => {
+app.get(`${basePath}/api/status`, async (req, res) => {
   const results = await loadResults();
   const summary = getYearSummary(results);
   res.json({
@@ -107,6 +123,12 @@ app.get('/api/status', async (req, res) => {
     } : null,
   });
 });
+
+// SPA fallback — must come after all /api routes
+if (process.env.NODE_ENV === 'production') {
+  const distDir = path.join(__dirname, '..', 'frontend', 'dist');
+  app.get(`${basePath}*`, (_req, res) => res.sendFile(path.join(distDir, 'index.html')));
+}
 
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {
