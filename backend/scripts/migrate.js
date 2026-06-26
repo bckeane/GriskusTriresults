@@ -16,14 +16,11 @@
  *   node backend/scripts/migrate.js --wipe   # drop and recreate table first
  */
 
-import { createRequire } from 'module';
+import { DatabaseSync } from 'node:sqlite';
 import { readFileSync, existsSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { parseSeconds } from '../time.js';
-
-const require = createRequire(import.meta.url);
-const Database = require('better-sqlite3');
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const JSON_FILE = join(__dirname, '..', 'data', 'results.json');
@@ -37,9 +34,9 @@ if (!existsSync(JSON_FILE)) {
   process.exit(1);
 }
 
-const db = new Database(DB_FILE);
-db.pragma('journal_mode = WAL');
-db.pragma('foreign_keys = ON');
+const db = new DatabaseSync(DB_FILE);
+db.exec('PRAGMA journal_mode = WAL');
+db.exec('PRAGMA foreign_keys = ON');
 
 if (wipe) {
   console.log('--wipe: dropping existing results table');
@@ -84,41 +81,44 @@ const insert = db.prepare(`
     (year, raceType, source, place, firstName, lastName, fullName,
      city, state, age, gender, division, divPlace, totalTime, swimTime, bikeTime, runTime, bib)
   VALUES
-    (@year, @raceType, @source, @place, @firstName, @lastName, @fullName,
-     @city, @state, @age, @gender, @division, @divPlace, @totalTime, @swimTime, @bikeTime, @runTime, @bib)
+    ($year, $raceType, $source, $place, $firstName, $lastName, $fullName,
+     $city, $state, $age, $gender, $division, $divPlace, $totalTime, $swimTime, $bikeTime, $runTime, $bib)
 `);
 
-const upsertMany = db.transaction((rows) => {
-  let count = 0;
-  for (const r of rows) {
-    insert.run({
-      year:      r.year      ?? null,
-      raceType:  r.raceType  ?? null,
-      source:    r.source    ?? null,
-      place:     r.place     ?? null,
-      firstName: r.firstName ?? null,
-      lastName:  r.lastName  ?? null,
-      fullName:  r.fullName  ?? null,
-      city:      r.city      ?? null,
-      state:     r.state     ?? null,
-      age:       r.age       ?? null,
-      gender:    r.gender    ?? null,
-      division:  r.division  ?? null,
-      divPlace:  r.divPlace  ?? null,
-      totalTime: r.totalTime ?? null,
-      swimTime:  r.swimTime  ?? null,
-      bikeTime:  r.bikeTime  ?? null,
-      runTime:   r.runTime   ?? null,
-      bib:       r.bib       ?? null,
-    });
-    count++;
-  }
-  return count;
-});
-
 let start = Date.now();
-const upserted = upsertMany(records);
-console.log(`Upserted ${upserted} records in ${((Date.now() - start) / 1000).toFixed(2)}s`);
+let upserted = 0;
+db.exec('BEGIN');
+try {
+  for (const r of records) {
+    insert.run({
+      $year:      r.year      ?? null,
+      $raceType:  r.raceType  ?? null,
+      $source:    r.source    ?? null,
+      $place:     r.place     ?? null,
+      $firstName: r.firstName ?? null,
+      $lastName:  r.lastName  ?? null,
+      $fullName:  r.fullName  ?? null,
+      $city:      r.city      ?? null,
+      $state:     r.state     ?? null,
+      $age:       r.age       ?? null,
+      $gender:    r.gender    ?? null,
+      $division:  r.division  ?? null,
+      $divPlace:  r.divPlace  ?? null,
+      $totalTime: r.totalTime ?? null,
+      $swimTime:  r.swimTime  ?? null,
+      $bikeTime:  r.bikeTime  ?? null,
+      $runTime:   r.runTime   ?? null,
+      $bib:       r.bib       ?? null,
+    });
+    upserted++;
+  }
+  db.exec('COMMIT');
+} catch (e) {
+  db.exec('ROLLBACK');
+  throw e;
+}
+const upserted_final = upserted;
+console.log(`Upserted ${upserted_final} records in ${((Date.now() - start) / 1000).toFixed(2)}s`);
 
 // ---------------------------------------------------------------------------
 // Phase 2: cross-source merge
@@ -160,33 +160,33 @@ if (multiSourceRaces.length === 0) {
 
   const updateRow = db.prepare(`
     UPDATE results SET
-      source    = @source,
-      place     = @place,
-      totalTime = @totalTime,
-      swimTime  = @swimTime,
-      bikeTime  = @bikeTime,
-      runTime   = @runTime,
-      division  = @division,
-      divPlace  = @divPlace,
-      city      = @city,
-      state     = @state,
-      bib       = @bib,
-      age       = @age,
-      gender    = @gender
-    WHERE id = @id
+      source    = $source,
+      place     = $place,
+      totalTime = $totalTime,
+      swimTime  = $swimTime,
+      bikeTime  = $bikeTime,
+      runTime   = $runTime,
+      division  = $division,
+      divPlace  = $divPlace,
+      city      = $city,
+      state     = $state,
+      bib       = $bib,
+      age       = $age,
+      gender    = $gender
+    WHERE id = $id
   `);
   const deleteRow = db.prepare('DELETE FROM results WHERE id = ?');
 
-  const mergeAll = db.transaction(() => {
-    let merged = 0;
-    let deleted = 0;
-
+  start = Date.now();
+  let merged = 0;
+  let deleted = 0;
+  db.exec('BEGIN');
+  try {
     for (const { year, raceType } of multiSourceRaces) {
       const rows = db.prepare(
         'SELECT * FROM results WHERE year = ? AND raceType = ? ORDER BY fullName, place'
       ).all(year, raceType);
 
-      // Group by fullName
       const byName = new Map();
       for (const r of rows) {
         if (!byName.has(r.fullName)) byName.set(r.fullName, []);
@@ -196,7 +196,6 @@ if (multiSourceRaces.length === 0) {
       for (const [, group] of byName) {
         if (group.length < 2) continue;
 
-        // Find pairs where times are within 2 seconds of each other
         for (let i = 0; i < group.length; i++) {
           for (let j = i + 1; j < group.length; j++) {
             const a = group[i];
@@ -208,28 +207,26 @@ if (multiSourceRaces.length === 0) {
             if (tA === null || tB === null) continue;
             if (Math.abs(tA - tB) > 2) continue;
 
-            // These are the same athlete — merge them.
-            // Pick the more authoritative source for place/time fields.
             const placeWinner = authority(a.source, PLACE_AUTHORITY) >= authority(b.source, PLACE_AUTHORITY) ? a : b;
             const splitsWinner = authority(a.source, SPLITS_AUTHORITY) >= authority(b.source, SPLITS_AUTHORITY) ? a : b;
-            const keep = placeWinner; // we update this row in-place
+            const keep = placeWinner;
             const drop = keep === a ? b : a;
 
             updateRow.run({
-              id:        keep.id,
-              source:    `${placeWinner.source}+${splitsWinner.source === placeWinner.source ? '' : splitsWinner.source}`.replace(/\+$/, ''),
-              place:     placeWinner.place,
-              totalTime: placeWinner.totalTime,
-              swimTime:  splitsWinner.swimTime  || placeWinner.swimTime  || null,
-              bikeTime:  splitsWinner.bikeTime  || placeWinner.bikeTime  || null,
-              runTime:   splitsWinner.runTime   || placeWinner.runTime   || null,
-              division:  placeWinner.division   || drop.division         || null,
-              divPlace:  placeWinner.divPlace   ?? drop.divPlace         ?? null,
-              city:      placeWinner.city       || drop.city             || null,
-              state:     placeWinner.state      || drop.state            || null,
-              bib:       placeWinner.bib        || drop.bib              || null,
-              age:       placeWinner.age        ?? drop.age              ?? null,
-              gender:    placeWinner.gender     || drop.gender           || null,
+              $id:        keep.id,
+              $source:    `${placeWinner.source}+${splitsWinner.source === placeWinner.source ? '' : splitsWinner.source}`.replace(/\+$/, ''),
+              $place:     placeWinner.place,
+              $totalTime: placeWinner.totalTime,
+              $swimTime:  splitsWinner.swimTime  || placeWinner.swimTime  || null,
+              $bikeTime:  splitsWinner.bikeTime  || placeWinner.bikeTime  || null,
+              $runTime:   splitsWinner.runTime   || placeWinner.runTime   || null,
+              $division:  placeWinner.division   || drop.division         || null,
+              $divPlace:  placeWinner.divPlace   ?? drop.divPlace         ?? null,
+              $city:      placeWinner.city       || drop.city             || null,
+              $state:     placeWinner.state      || drop.state            || null,
+              $bib:       placeWinner.bib        || drop.bib              || null,
+              $age:       placeWinner.age        ?? drop.age              ?? null,
+              $gender:    placeWinner.gender     || drop.gender           || null,
             });
             deleteRow.run(drop.id);
 
@@ -241,14 +238,15 @@ if (multiSourceRaces.length === 0) {
         }
       }
     }
-    return { merged, deleted };
-  });
-
-  start = Date.now();
-  const { merged, deleted } = mergeAll();
-  console.log(`Merged ${merged} pairs, deleted ${deleted} duplicate rows in ${((Date.now() - start) / 1000).toFixed(2)}s`);
+    db.exec('COMMIT');
+  } catch (e) {
+    db.exec('ROLLBACK');
+    throw e;
+  }
+  const mergeResult = { merged, deleted };
+  console.log(`Merged ${mergeResult.merged} pairs, deleted ${mergeResult.deleted} duplicate rows in ${((Date.now() - start) / 1000).toFixed(2)}s`);
 }
 
-const { total } = db.prepare('SELECT COUNT(*) AS total FROM results').get();
+const { total } = db.prepare('SELECT COUNT(*) AS total FROM results').get({});
 console.log(`\nFinal DB: ${total} rows`);
 db.close();

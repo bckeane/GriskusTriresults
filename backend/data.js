@@ -1,11 +1,8 @@
-import { createRequire } from 'module';
+import { DatabaseSync } from 'node:sqlite';
 import { existsSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { parseSeconds, formatSeconds } from './time.js';
-
-const require = createRequire(import.meta.url);
-const Database = require('better-sqlite3');
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const DB_FILE = join(__dirname, 'data', 'griskus.db');
@@ -16,8 +13,8 @@ let cache = null;
 function getDb() {
   if (db) return db;
   if (!existsSync(DB_FILE)) return null;
-  db = new Database(DB_FILE);
-  db.pragma('journal_mode = WAL');
+  db = new DatabaseSync(DB_FILE);
+  db.exec('PRAGMA journal_mode = WAL');
   return db;
 }
 
@@ -68,40 +65,45 @@ export function upsertBySource(source, records) {
       (year, raceType, source, place, firstName, lastName, fullName,
        city, state, age, gender, division, divPlace, totalTime, swimTime, bikeTime, runTime, bib)
     VALUES
-      (@year, @raceType, @source, @place, @firstName, @lastName, @fullName,
-       @city, @state, @age, @gender, @division, @divPlace, @totalTime, @swimTime, @bikeTime, @runTime, @bib)
+      ($year, $raceType, $source, $place, $firstName, $lastName, $fullName,
+       $city, $state, $age, $gender, $division, $divPlace, $totalTime, $swimTime, $bikeTime, $runTime, $bib)
   `);
-  conn.transaction(() => {
+  conn.exec('BEGIN');
+  try {
     del.run(source);
     for (const r of records) {
       ins.run({
-        year:      r.year      ?? null,
-        raceType:  r.raceType  ?? null,
-        source:    source,
-        place:     r.place     ?? null,
-        firstName: r.firstName ?? null,
-        lastName:  r.lastName  ?? null,
-        fullName:  r.fullName  ?? null,
-        city:      r.city      ?? null,
-        state:     r.state     ?? null,
-        age:       r.age       ?? null,
-        gender:    r.gender    ?? null,
-        division:  r.division  ?? null,
-        divPlace:  r.divPlace  ?? null,
-        totalTime: r.totalTime ?? null,
-        swimTime:  r.swimTime  ?? null,
-        bikeTime:  r.bikeTime  ?? null,
-        runTime:   r.runTime   ?? null,
-        bib:       r.bib       ?? null,
+        $year:      r.year      ?? null,
+        $raceType:  r.raceType  ?? null,
+        $source:    source,
+        $place:     r.place     ?? null,
+        $firstName: r.firstName ?? null,
+        $lastName:  r.lastName  ?? null,
+        $fullName:  r.fullName  ?? null,
+        $city:      r.city      ?? null,
+        $state:     r.state     ?? null,
+        $age:       r.age       ?? null,
+        $gender:    r.gender    ?? null,
+        $division:  r.division  ?? null,
+        $divPlace:  r.divPlace  ?? null,
+        $totalTime: r.totalTime ?? null,
+        $swimTime:  r.swimTime  ?? null,
+        $bikeTime:  r.bikeTime  ?? null,
+        $runTime:   r.runTime   ?? null,
+        $bib:       r.bib       ?? null,
       });
     }
-  })();
+    conn.exec('COMMIT');
+  } catch (e) {
+    conn.exec('ROLLBACK');
+    throw e;
+  }
   invalidateCache();
 }
 
 function openDb() {
-  db = new Database(DB_FILE);
-  db.pragma('journal_mode = WAL');
+  db = new DatabaseSync(DB_FILE);
+  db.exec('PRAGMA journal_mode = WAL');
   db.exec(`
     CREATE TABLE IF NOT EXISTS results (
       id        INTEGER PRIMARY KEY,
