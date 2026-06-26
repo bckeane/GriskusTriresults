@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
+import { api } from '../utils/api.js';
 import { useSort } from '../hooks/useSort.js';
 import { parseTimeSeconds, formatSeconds } from '../utils/time.js';
 import { computeTriScore } from '../utils/pace.js';
@@ -24,7 +25,7 @@ export default function RaceResults({ year, raceType, onBack, onSelectAthlete })
 
   useEffect(() => {
     setLoading(true);
-    fetch(`/api/results?year=${year}&raceType=${encodeURIComponent(raceType)}&limit=10000`)
+    fetch(api(`/api/results?year=${year}&raceType=${encodeURIComponent(raceType)}&limit=10000`))
       .then(r => r.json())
       .then(d => {
         const raw = d.results ?? [];

@@ -1,6 +1,7 @@
 import { useState, lazy, Suspense } from 'react';
 import { useSort } from '../hooks/useSort.js';
 import { computePacing, formatPace, formatMPH } from '../utils/pace.js';
+import { api } from '../utils/api.js';
 
 const TimelineChart = lazy(() => import('./TimelineChart.jsx'));
 
@@ -233,8 +234,8 @@ export default function AthleteView({ firstName, lastName, onBack }) {
     setError(null);
 
     Promise.all([
-      fetch(`/api/athletes/${encodeURIComponent(lastName)}/${encodeURIComponent(firstName)}`).then(r => r.json()),
-      fetch('/api/summary').then(r => r.json()),
+      fetch(api(`/api/athletes/${encodeURIComponent(lastName)}/${encodeURIComponent(firstName)}`)).then(r => r.json()),
+      fetch(api('/api/summary')).then(r => r.json()),
     ])
       .then(([d, s]) => {
         if (d.error) throw new Error(d.error);

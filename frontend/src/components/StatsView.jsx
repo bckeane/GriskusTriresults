@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { api } from '../utils/api.js';
 import {
   BarChart, Bar, LineChart, Line, AreaChart, Area,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine,
@@ -339,8 +340,8 @@ export default function StatsView({ onBack }) {
 
   useEffect(() => {
     Promise.all([
-      fetch('/api/summary').then(r => r.json()),
-      fetch('/api/demographics').then(r => r.json()),
+      fetch(api('/api/summary')).then(r => r.json()),
+      fetch(api('/api/demographics')).then(r => r.json()),
     ])
       .then(([s, d]) => { setSummary(s); setDemographics(d); })
       .catch(() => {})

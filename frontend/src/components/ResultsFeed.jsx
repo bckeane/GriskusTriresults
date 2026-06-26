@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useSort } from '../hooks/useSort.js';
+import { api } from '../utils/api.js';
 
 const TYPE_COLORS = {
   Olympic: 'text-blue-600 bg-blue-50',
@@ -18,7 +19,7 @@ export default function ResultsFeed({ onSelectAthlete }) {
 
   useEffect(() => {
     setLoading(true);
-    fetch(`/api/results?limit=${PAGE_SIZE}&offset=${offset}`)
+    fetch(api(`/api/results?limit=${PAGE_SIZE}&offset=${offset}`))
       .then(r => r.json())
       .then(data => {
         setResults(data.results);

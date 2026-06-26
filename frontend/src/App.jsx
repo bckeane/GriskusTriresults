@@ -1,4 +1,5 @@
 import { useState, useEffect, lazy, Suspense, Component } from 'react';
+import { api } from './utils/api.js';
 import SearchBar from './components/SearchBar.jsx';
 import AthleteView from './components/AthleteView.jsx';
 import YearBrowser from './components/YearBrowser.jsx';
@@ -56,7 +57,7 @@ export default function App() {
   const [status, setStatus] = useState(null);
 
   useEffect(() => {
-    fetch('/api/status')
+    fetch(api('/api/status'))
       .then(r => r.json())
       .then(setStatus)
       .catch(() => {});

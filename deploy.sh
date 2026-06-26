@@ -24,7 +24,7 @@ DEPLOY_REMOTE="ssh://${SSH_USER}@${SSH_HOST}:${SSH_PORT}/home/${SSH_USER}/repos/
 
 # ── Build the React frontend ──────────────────────────────────────────────────
 echo "▶  Building frontend…"
-(cd frontend && VITE_BASE_PATH=/griskus npm run build)
+(cd frontend && VITE_BASE_PATH=/griskus VITE_API_BASE=/griskus npm run build)
 
 # ── Push to server via git ────────────────────────────────────────────────────
 echo "▶  Pushing to ${SSH_HOST}…"

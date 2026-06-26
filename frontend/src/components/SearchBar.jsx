@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { api } from '../utils/api.js';
 
 export default function SearchBar({ onSelect }) {
   const [query, setQuery] = useState('');
@@ -28,7 +29,7 @@ export default function SearchBar({ onSelect }) {
     debounceRef.current = setTimeout(async () => {
       setLoading(true);
       try {
-        const resp = await fetch(`/api/athletes/search?q=${encodeURIComponent(query)}`);
+        const resp = await fetch(api(`/api/athletes/search?q=${encodeURIComponent(query)}`));
         const data = await resp.json();
         setResults(data);
         setOpen(true);

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { api } from '../utils/api.js';
 
 const RACE_TYPES = ['Olympic', 'Sprint', 'Duathlon'];
 
@@ -107,7 +108,7 @@ export default function YearBrowser({ status, onViewRace }) {
   const [activeTab, setActiveTab] = useState('Olympic');
 
   useEffect(() => {
-    fetch('/api/summary')
+    fetch(api('/api/summary'))
       .then(r => r.json())
       .then(setSummary)
       .catch(() => setSummary([]))
@@ -142,7 +143,7 @@ export default function YearBrowser({ status, onViewRace }) {
         <p className="text-sm text-slate-400 mt-1">Run the scraper to pull in results from all years</p>
         <button
           onClick={async () => {
-            await fetch('/api/scrape', { method: 'POST' });
+            await fetch(api('/api/scrape'), { method: 'POST' });
             setTimeout(() => window.location.reload(), 2000);
           }}
           className="mt-4 rounded-lg bg-brand-800 px-4 py-2 text-sm font-medium text-white hover:bg-brand-900 transition-colors"
