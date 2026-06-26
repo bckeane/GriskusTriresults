@@ -1,4 +1,4 @@
-import { useState, lazy, Suspense } from 'react';
+import { useState, useEffect, lazy, Suspense } from 'react';
 import { useSort } from '../hooks/useSort.js';
 import { computePacing, formatPace, formatMPH } from '../utils/pace.js';
 import { api } from '../utils/api.js';
