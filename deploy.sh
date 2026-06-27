@@ -26,7 +26,19 @@ DEPLOY_REMOTE="ssh://${SSH_USER}@${SSH_HOST}:${SSH_PORT}/home/${SSH_USER}/repos/
 echo "▶  Building frontend…"
 (cd frontend && VITE_BASE_PATH=/griskus VITE_API_BASE=/griskus npm run build)
 
-# ── Push to server via git ────────────────────────────────────────────────────
+# Commit the freshly-built dist so the server always gets the correctly-built
+# assets. Without this, a manually-committed dist (built without the env vars)
+# would ship broken API paths.
+if ! git diff --quiet frontend/dist/; then
+  echo "▶  Committing updated dist…"
+  git add frontend/dist/
+  git commit -m "chore: rebuild dist for deploy ($(date +%Y-%m-%d))"
+fi
+
+# ── Push to GitHub + server ───────────────────────────────────────────────────
+echo "▶  Pushing to GitHub…"
+git push origin main
+
 echo "▶  Pushing to ${SSH_HOST}…"
 GIT_SSH_COMMAND="ssh ${SSH_OPTS}" git push deploy main
 
