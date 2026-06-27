@@ -5,7 +5,8 @@ export default {
     extend: {
       fontFamily: {
         display: ['Barlow Condensed', 'ui-sans-serif', 'system-ui', 'sans-serif'],
-        sans: ['Inter', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+        sans: ['DM Sans', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+        data: ['Geist Mono', 'ui-monospace', 'monospace'],
       },
       colors: {
         brand: {
@@ -20,11 +21,11 @@ export default {
           800: '#143e5e',
           900: '#0e2d44',
         },
-        // Finish-line amber — podium finishes, PB highlights only
+        // Finish-line copper — PBs and podium only; scarcity is load-bearing
         finish: {
-          400: '#f0a832',
-          500: '#e8962a',
-          600: '#c97a1e',
+          400: '#d4923a',
+          500: '#c87f3e',
+          600: '#a8662e',
         },
       },
     },

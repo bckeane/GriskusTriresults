@@ -3,12 +3,7 @@ import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Dot, ReferenceLine,
 } from 'recharts';
 import { parseTimeSeconds, formatSeconds } from '../utils/time.js';
-
-const RACE_TYPE_COLOR = {
-  Olympic:  '#1a5078',  // brand-700
-  Sprint:   '#10b981',
-  Duathlon: '#e8962a',  // finish-500
-};
+import { RACE_TYPE_HEX } from '../constants/raceTypes.js';
 
 function fallbackColor(raceType) {
   let h = 0;
@@ -17,7 +12,7 @@ function fallbackColor(raceType) {
 }
 
 function colorFor(raceType) {
-  return RACE_TYPE_COLOR[raceType] ?? fallbackColor(raceType);
+  return RACE_TYPE_HEX[raceType] ?? fallbackColor(raceType);
 }
 
 function buildSeries(results, summary) {
@@ -101,7 +96,7 @@ function PBDot({ cx, cy, payload, dataKey, typePB, ...rest }) {
   if (val === null || val === undefined) return null;
   const isPB = val === typePB[dataKey];
   if (isPB) {
-    return <Dot cx={cx} cy={cy} r={6} fill="#e8962a" stroke="#fff" strokeWidth={2} />;
+    return <Dot cx={cx} cy={cy} r={6} fill="#c87f3e" stroke="#fff" strokeWidth={2} />;
   }
   return <Dot cx={cx} cy={cy} r={3} fill={rest.stroke} stroke={rest.stroke} />;
 }
@@ -224,7 +219,7 @@ export default function TimelineChart({ results, summary }) {
                 stroke={colorFor(type)}
                 strokeWidth={2}
                 connectNulls={false}
-                dot={(props) => <PBDot {...props} dataKey={type} typePB={typePB} />}
+                dot={({ key, ...props }) => <PBDot key={key} {...props} dataKey={type} typePB={typePB} />}
                 activeDot={{ r: 5 }}
               />
             ))}

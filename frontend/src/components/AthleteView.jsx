@@ -1,22 +1,16 @@
-import { useState, useEffect, lazy, Suspense } from 'react';
+import { useState, useEffect, useMemo, lazy, Suspense } from 'react';
 import { useSort } from '../hooks/useSort.js';
 import { computePacing, formatPace, formatMPH } from '../utils/pace.js';
+import { parseTimeSeconds } from '../utils/time.js';
 import { api } from '../utils/api.js';
+import { loadPin, savePin, clearPin, pinMatches } from '../utils/pin.js';
+import { RACE_TYPE_COLORS, RACE_TYPE_HEADER } from '../constants/raceTypes.js';
+import StatCard from './StatCard.jsx';
 
-const TimelineChart = lazy(() => import('./TimelineChart.jsx'));
-
-const RACE_TYPE_COLORS = {
-  Olympic:  'bg-blue-100 text-blue-800',
-  Sprint:   'bg-emerald-100 text-emerald-800',
-  Duathlon: 'bg-amber-100 text-amber-800',
-  Unknown:  'bg-slate-100 text-slate-600',
-};
-
-const RACE_TYPE_HEADER = {
-  Olympic:  'border-blue-400 text-blue-700',
-  Sprint:   'border-emerald-400 text-emerald-700',
-  Duathlon: 'border-amber-400 text-amber-700',
-};
+const TimelineChart   = lazy(() => import('./TimelineChart.jsx'));
+const DisciplineRadar = lazy(() => import('./DisciplineRadar.jsx'));
+const CareerArc       = lazy(() => import('./CareerArc.jsx'));
+const FunStats        = lazy(() => import('./FunStats.jsx'));
 
 function Badge({ label }) {
   const cls = RACE_TYPE_COLORS[label] || RACE_TYPE_COLORS.Unknown;
@@ -27,15 +21,6 @@ function Badge({ label }) {
   );
 }
 
-function StatCard({ label, value, sub }) {
-  return (
-    <div className="rounded-lg bg-white border border-slate-200 px-4 py-3 text-center shadow-sm">
-      <div className="font-display text-3xl font-bold text-brand-900 leading-tight">{value}</div>
-      {sub && <div className="text-xs text-slate-400 mt-0.5">{sub}</div>}
-      <div className="text-xs text-slate-500 mt-0.5 tracking-wide">{label}</div>
-    </div>
-  );
-}
 
 function SortableTh({ label, colKey, sort, toggle, align = 'left', title }) {
   const active = sort.key === colKey;
@@ -228,6 +213,7 @@ export default function AthleteView({ firstName, lastName, onBack }) {
   const [summary, setSummary] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [pin, setPin] = useState(() => loadPin());
 
   useEffect(() => {
     setLoading(true);
@@ -245,6 +231,63 @@ export default function AthleteView({ firstName, lastName, onBack }) {
       .catch(e => setError(e.message))
       .finally(() => setLoading(false));
   }, [firstName, lastName]);
+
+  // All derived values must be computed before any early return (Rules of Hooks).
+  const results = data?.results ?? [];
+  const years = useMemo(() => [...new Set(results.map(r => r.year))].sort(), [results]);
+  const bestPlace = useMemo(
+    () => Math.min(...results.filter(r => r.place).map(r => r.place)),
+    [results]
+  );
+  const byType = useMemo(() => ({
+    Olympic:  results.filter(r => r.raceType === 'Olympic'),
+    Sprint:   results.filter(r => r.raceType === 'Sprint'),
+    Duathlon: results.filter(r => r.raceType === 'Duathlon'),
+  }), [results]);
+  const bestTri = useMemo(() => {
+    const scores = results
+      .map(r => r.triScore ? { score: r.triScore.score, year: r.year, raceType: r.raceType } : null)
+      .filter(Boolean);
+    return scores.length > 0 ? scores.reduce((a, b) => b.score > a.score ? b : a) : null;
+  }, [results]);
+  const { estimatedMiles, totalHours } = useMemo(() => {
+    const DISTANCES = { Olympic: 32, Sprint: 16, Duathlon: 31 };
+    const miles = results.reduce((sum, r) => sum + (DISTANCES[r.raceType] ?? 0), 0);
+    const racingSecs = results.reduce((sum, r) => sum + (parseTimeSeconds(r.totalTime) ?? 0), 0);
+    return { estimatedMiles: miles, totalHours: Math.round((racingSecs / 3600) * 2) / 2 };
+  }, [results]);
+  const { bestDivPlace, divPlaceCount } = useMemo(() => {
+    const ranked = results.filter(r => r.divRank != null && typeof r.divRank === 'number');
+    return {
+      bestDivPlace: ranked.length > 0 ? Math.min(...ranked.map(r => r.divRank)) : null,
+      divPlaceCount: ranked.length,
+    };
+  }, [results]);
+  const shareUrl = `${window.location.origin}?firstName=${encodeURIComponent(firstName)}&lastName=${encodeURIComponent(lastName)}`;
+
+  // Best single-race time across all types (for nameplate PB badge)
+  const bestPB = useMemo(() => {
+    let best = null;
+    for (const r of results) {
+      const secs = parseTimeSeconds(r.totalTime);
+      if (secs == null) continue;
+      if (!best || secs < best.secs) best = { secs, time: r.totalTime, year: r.year, raceType: r.raceType };
+    }
+    return best;
+  }, [results]);
+
+  // Most common city/state from results for location display
+  const hometown = useMemo(() => {
+    const counts = {};
+    for (const r of results) {
+      if (!r.city && !r.state) continue;
+      const key = [r.city, r.state].filter(Boolean).join(', ');
+      counts[key] = (counts[key] ?? 0) + 1;
+    }
+    const entries = Object.entries(counts);
+    if (!entries.length) return null;
+    return entries.reduce((a, b) => b[1] > a[1] ? b : a)[0];
+  }, [results]);
 
   if (loading) {
     return (
@@ -265,29 +308,11 @@ export default function AthleteView({ firstName, lastName, onBack }) {
     );
   }
 
-  const { results = [] } = data || {};
-  const years = [...new Set(results.map(r => r.year))].sort();
-  const bestPlace = Math.min(...results.filter(r => r.place).map(r => r.place));
-
-  // Best TriScore across all races — triScore arrives from backend now
-  const allScores = results
-    .map(r => r.triScore ? { score: r.triScore.score, year: r.year, raceType: r.raceType } : null)
-    .filter(Boolean);
-  const bestTri = allScores.length > 0 ? allScores.reduce((a, b) => b.score > a.score ? b : a) : null;
-
-  const byType = {
-    Olympic:  results.filter(r => r.raceType === 'Olympic'),
-    Sprint:   results.filter(r => r.raceType === 'Sprint'),
-    Duathlon: results.filter(r => r.raceType === 'Duathlon'),
-  };
-
   // Adaptive 4th stat card: Best TriScore when available, otherwise most-raced type count
   const mostRacedType = Object.entries(byType).reduce((a, b) => b[1].length > a[1].length ? b : a);
   const fourthCard = bestTri
     ? { label: 'Best TriScore', value: bestTri.score, sub: `${bestTri.year} ${bestTri.raceType}` }
     : { label: mostRacedType[0], value: mostRacedType[1].length, sub: undefined };
-
-  const shareUrl = `${window.location.origin}?firstName=${encodeURIComponent(firstName)}&lastName=${encodeURIComponent(lastName)}`;
 
   return (
     <div className="space-y-6">
@@ -304,9 +329,9 @@ export default function AthleteView({ firstName, lastName, onBack }) {
         <button
           onClick={() => navigator.clipboard?.writeText(shareUrl)}
           className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-slate-700 transition-colors"
-          title="Copy link to this athlete"
+          aria-label="Copy link to this athlete"
         >
-          <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+          <svg className="h-3.5 w-3.5" aria-hidden="true" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" d="M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m13.35-.622l1.757-1.757a4.5 4.5 0 00-6.364-6.364l-4.5 4.5a4.5 4.5 0 001.242 7.244" />
           </svg>
           Copy link
@@ -314,25 +339,95 @@ export default function AthleteView({ firstName, lastName, onBack }) {
       </div>
 
       {/* Athlete nameplate */}
-      <div className="border-t-2 border-brand-900 pt-4">
-        <h2 className="font-display text-5xl sm:text-6xl font-bold tracking-tight text-brand-900 leading-none">
-          {data?.fullName?.toUpperCase()}
-        </h2>
-        <p className="mt-2 font-display text-sm tracking-[0.2em] text-slate-400 uppercase">
-          {years.length > 0 && `${years[0]}${years.length > 1 ? ` – ${years[years.length - 1]}` : ''}`}
-          {results.length > 0 && ` · ${results.length} race${results.length !== 1 ? 's' : ''}`}
-        </p>
+      <div
+        className="rounded-xl overflow-hidden relative"
+        style={{ background: 'linear-gradient(135deg, #0e2d44 0%, #162c3d 100%)' }}
+      >
+        {/* Diagonal texture overlay */}
+        <div
+          className="absolute inset-0 pointer-events-none"
+          style={{
+            backgroundImage: 'repeating-linear-gradient(-45deg, transparent, transparent 32px, rgba(255,255,255,0.015) 32px, rgba(255,255,255,0.015) 33px)',
+          }}
+        />
+        <div className="relative p-6 sm:p-8">
+          {/* Years badge */}
+          {years.length > 0 && (
+            <div className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/8 px-3 py-1 text-[11px] font-medium text-white/60 mb-3">
+              {years.length > 1
+                ? `${years.length} years racing Griskus · ${years[0]}–${years[years.length - 1]}`
+                : `${years[0]} · 1 race`}
+            </div>
+          )}
+
+          {/* Name + claim controls */}
+          <div className="flex items-start justify-between gap-4">
+            <h2 className="font-display text-5xl sm:text-6xl font-bold tracking-tight text-white leading-none uppercase">
+              {data?.fullName}
+            </h2>
+            <div className="flex-shrink-0 pt-1">
+              {pinMatches(pin, firstName, lastName) ? (
+                <div className="flex flex-col items-end gap-1">
+                  <span className="text-xs text-emerald-400 font-medium">You've claimed this page</span>
+                  <button
+                    onClick={() => { clearPin(); setPin(null); }}
+                    className="text-xs text-white/40 hover:text-red-400 transition-colors underline"
+                  >
+                    Remove claim
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => { savePin(firstName, lastName); setPin(loadPin()); }}
+                  className="rounded-full border border-white/20 px-3 py-1 text-xs font-medium text-white/70 hover:bg-white/10 transition-colors"
+                >
+                  This is me
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Location */}
+          {hometown && (
+            <p className="mt-2 text-sm text-white/40">{hometown}</p>
+          )}
+
+          {/* PB badge */}
+          {bestPB && (
+            <div className="mt-4 inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-semibold text-white" style={{ background: '#c87f3e' }}>
+              ★ PB: {bestPB.time} ({bestPB.year} {bestPB.raceType})
+            </div>
+          )}
+        </div>
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
         <StatCard label="Total Races" value={results.length} />
         <StatCard label="Best Finish" value={isFinite(bestPlace) ? `#${bestPlace}` : '—'} />
         <StatCard label="Olympic" value={byType.Olympic.length} />
         <StatCard label={fourthCard.label} value={fourthCard.value} sub={fourthCard.sub} />
+        <StatCard
+          label="Best Div Rank"
+          value={bestDivPlace != null ? `#${bestDivPlace}` : '—'}
+          sub={divPlaceCount > 0 ? `across ${divPlaceCount} race${divPlaceCount !== 1 ? 's' : ''}` : undefined}
+        />
+        <StatCard label="Est. Miles Raced" value={estimatedMiles > 0 ? `~${Math.round(estimatedMiles).toLocaleString()}` : '—'} />
       </div>
+
+      <Suspense fallback={<div className="h-[140px] rounded-xl border border-slate-200 bg-white shadow-sm animate-pulse" />}>
+        <FunStats results={results} estimatedMiles={estimatedMiles} totalHours={totalHours} />
+      </Suspense>
 
       <Suspense fallback={<div className="h-[252px] rounded-xl border border-slate-200 bg-white shadow-sm animate-pulse" />}>
         <TimelineChart results={results} summary={summary} />
+      </Suspense>
+
+      <Suspense fallback={<div className="h-[200px] rounded-xl border border-slate-200 bg-white shadow-sm animate-pulse" />}>
+        <CareerArc results={results} summary={summary} />
+      </Suspense>
+
+      <Suspense fallback={<div className="h-[280px] rounded-xl border border-slate-200 bg-white shadow-sm animate-pulse" />}>
+        <DisciplineRadar results={results} />
       </Suspense>
 
       <RaceTypeTable raceType="Olympic"  results={byType.Olympic} />

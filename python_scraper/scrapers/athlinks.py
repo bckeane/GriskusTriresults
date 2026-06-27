@@ -1,5 +1,5 @@
 """
-Athlinks scraper for Pat Griskus Sprint Triathlon results, 2009–2016.
+Athlinks scraper for Pat Griskus Sprint Triathlon results, 2009–2016 and 2021.
 
 Uses the results.athlinks.com JSON API (no Playwright needed).
 Series master ID: 30740 (Pat Griskus Sprint Triathalon)
@@ -45,6 +45,7 @@ EVENTS = [
     (2014, 358923, 579757),
     (2015, 460001, 686063),
     (2016, 567372, 847426),
+    (2021, 977935, 2091993),
 ]
 
 # Keywords that indicate a relay course — skip these
@@ -276,7 +277,7 @@ def fetch_event_results(year, event_id, event_course_id, splits_cache, skip_spli
 
 
 def scrape_athlinks(skip_splits=False):
-    print('Scraping Athlinks API (2009–2016 Sprint)...')
+    print('Scraping Athlinks API (2009–2016 + 2021 Sprint)...')
     splits_cache = load_splits_cache()
     if splits_cache:
         print(f'  Loaded {len(splits_cache)} cached splits')

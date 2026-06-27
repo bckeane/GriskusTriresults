@@ -4,6 +4,7 @@ import SearchBar from './components/SearchBar.jsx';
 import AthleteView from './components/AthleteView.jsx';
 import YearBrowser from './components/YearBrowser.jsx';
 import RaceResults from './components/RaceResults.jsx';
+import YourResultsCard from './components/YourResultsCard.jsx';
 
 const StatsView = lazy(() => import('./components/StatsView.jsx'));
 
@@ -97,28 +98,23 @@ export default function App() {
   return (
     <div className="min-h-screen bg-[#fafaf8]">
       {/* Header */}
-      <header className="bg-white border-b border-slate-200">
-        <div className="mx-auto max-w-5xl px-4 py-4">
-          <div className="flex items-center justify-between gap-4">
-            <button
-              onClick={handleBack}
-              className="text-left group"
-            >
-              <div className="font-display text-2xl font-bold tracking-tight text-brand-900 leading-none group-hover:text-brand-700 transition-colors">
-                Pat Griskus
-              </div>
-              <div className="font-display text-xs font-500 tracking-[0.2em] text-slate-400 uppercase mt-0.5">
-                Triathlon · Middlebury CT
-              </div>
-            </button>
-            <div className="flex items-center gap-3">
-              <button
-                onClick={handleViewStats}
-                className="text-sm text-slate-500 hover:text-brand-700 transition-colors whitespace-nowrap font-medium"
-              >
-                Race Stats
-              </button>
+      <header className="bg-brand-900 sticky top-0 z-50">
+        <div className="mx-auto max-w-5xl px-4 h-13 flex items-center justify-between gap-4" style={{ height: '52px' }}>
+          <button
+            onClick={handleBack}
+            className="text-left group"
+          >
+            <div className="font-display text-xl font-bold tracking-wide text-white uppercase leading-none group-hover:text-brand-200 transition-colors">
+              Griskus
             </div>
+          </button>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={handleViewStats}
+              className="text-sm text-white/60 hover:text-white transition-colors whitespace-nowrap font-medium"
+            >
+              Race Stats
+            </button>
           </div>
         </div>
       </header>
@@ -153,6 +149,7 @@ export default function App() {
         ) : (
           /* Home view */
           <div className="space-y-8">
+            <YourResultsCard onSelectAthlete={handleSelectAthlete} />
             {/* Hero: bold finisher count statement */}
             <div className="bg-brand-900 rounded-2xl px-8 py-10 text-white relative">
               {/* Lake Quassapaug outline — the race venue, ghosted into the card */}

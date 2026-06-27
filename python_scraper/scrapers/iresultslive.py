@@ -32,8 +32,8 @@ EVENTS = [
     (2019, 4270, [('Olympic', 'OLY'), ('Sprint', 'SPRINT'), ('Duathlon', 'OLYDUATHLON')]),
     (2019, 4323, [('Sprint', 'INDIVIDUAL')]),
 
-    # 2021: One combined event (COVID-limited field, but Olympic+Duathlon+Sprint all ran)
-    (2021, 5002, [('Olympic', 'OLYMPICTRI'), ('Duathlon', 'OLYMPICDU'), ('Sprint', 'SPRINTTRI')]),
+    # 2021: Olympic+Duathlon from iResultsLive; Sprint sourced from Athlinks (135 finishers vs 67 here)
+    (2021, 5002, [('Olympic', 'OLYMPICTRI'), ('Duathlon', 'OLYMPICDU')]),
 
     # 2022: Combined day (eid=5295) + standalone Sprint day (eid=5316)
     (2022, 5295, [('Olympic', 'OLY'), ('Sprint', 'SPRINT'), ('Duathlon', 'DUATHLON')]),

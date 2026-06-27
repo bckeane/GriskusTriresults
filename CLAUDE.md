@@ -73,10 +73,10 @@ Times are strings in `H:MM:SS` or `MM:SS` format. The `useSort` hook in `fronten
 **Python scraper sources by year:**
 - 1999–2005: plattsys (static HTML)
 - 2006–2008: Wayback Machine (roadntracksports.com)
-- 2009–2016: Athlinks API (Sprint only)
+- 2009–2016, 2021: Athlinks API (Sprint only; 2021 Sprint has 135 finishers vs 67 on iResultsLive)
 - 2009–2014: FastTrack (Wayback Machine, Olympic only)
 - 2010–2016: USAT (Olympic/Duathlon — experimental)
-- 2017–2022: iResultsLive AJAX API
+- 2017–2022: iResultsLive AJAX API (2021 Sprint excluded — use Athlinks instead)
 - 2023–2025: RunSignup REST API
 
 Historical sources (plattsys, web_archive, athlinks, fasttrack) are cached — re-running the scraper skips them unless `--force` is passed. RunSignup always re-runs to pick up new race years.
@@ -99,3 +99,10 @@ Key routing rules:
 - Save progress → invoke /context-save
 - Resume context → invoke /context-restore
 - Author a backlog-ready spec/issue → invoke /spec
+
+## Design System
+
+Always read `DESIGN.md` before making any visual or UI decisions.
+Font choices, color tokens, spacing, component patterns, and aesthetic direction are all defined there.
+Do not deviate without explicit user approval.
+In QA mode, flag any code that doesn't match `DESIGN.md`.

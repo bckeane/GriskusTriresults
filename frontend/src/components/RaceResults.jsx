@@ -66,7 +66,7 @@ export default function RaceResults({ year, raceType, onBack, onSelectAthlete })
   const TYPE_COLOR = {
     Olympic:  'text-brand-800 bg-brand-100',
     Sprint:   'text-emerald-700 bg-emerald-100',
-    Duathlon: 'text-finish-600 bg-finish-400/20',
+    Duathlon: 'text-violet-700 bg-violet-100',
   };
 
   return (
