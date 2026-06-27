@@ -1,5 +1,4 @@
-import { useState, useEffect } from 'react';
-import { api } from '../utils/api.js';
+import { useState } from 'react';
 
 const RACE_TYPES = ['Olympic', 'Sprint', 'Duathlon'];
 
@@ -102,18 +101,12 @@ function RaceColumn({ raceType, years, byKey, onViewRace }) {
   );
 }
 
-export default function YearBrowser({ status, onViewRace }) {
-  const [summary, setSummary] = useState([]);
-  const [loading, setLoading] = useState(true);
+export default function YearBrowser({ status, summary: summaryProp, onViewRace }) {
   const [activeTab, setActiveTab] = useState('Olympic');
 
-  useEffect(() => {
-    fetch(api('/api/summary'))
-      .then(r => r.json())
-      .then(setSummary)
-      .catch(() => setSummary([]))
-      .finally(() => setLoading(false));
-  }, []);
+  // null = still loading (App hasn't resolved yet), [] = loaded but empty
+  const loading = summaryProp === null;
+  const summary = summaryProp ?? [];
 
   // Index by "year-raceType" and collect all years
   const byKey = {};
@@ -143,7 +136,7 @@ export default function YearBrowser({ status, onViewRace }) {
         <p className="text-sm text-slate-400 mt-1">Run the scraper to pull in results from all years</p>
         <button
           onClick={async () => {
-            await fetch(api('/api/scrape'), { method: 'POST' });
+            await fetch('/griskus/api/scrape', { method: 'POST' });
             setTimeout(() => window.location.reload(), 2000);
           }}
           className="mt-4 rounded-lg bg-brand-800 px-4 py-2 text-sm font-medium text-white hover:bg-brand-900 transition-colors"

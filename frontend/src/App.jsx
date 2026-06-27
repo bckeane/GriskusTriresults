@@ -1,12 +1,12 @@
 import { useState, useEffect, lazy, Suspense, Component } from 'react';
 import { api } from './utils/api.js';
 import SearchBar from './components/SearchBar.jsx';
-import AthleteView from './components/AthleteView.jsx';
 import YearBrowser from './components/YearBrowser.jsx';
-import RaceResults from './components/RaceResults.jsx';
 import YourResultsCard from './components/YourResultsCard.jsx';
 
-const StatsView = lazy(() => import('./components/StatsView.jsx'));
+const AthleteView = lazy(() => import('./components/AthleteView.jsx'));
+const RaceResults = lazy(() => import('./components/RaceResults.jsx'));
+const StatsView   = lazy(() => import('./components/StatsView.jsx'));
 
 class StatsErrorBoundary extends Component {
   constructor(props) {
@@ -56,12 +56,16 @@ function pushRoute(params) {
 export default function App() {
   const [route, setRoute] = useState(parseRoute);
   const [status, setStatus] = useState(null);
+  const [summary, setSummary] = useState(null);
 
   useEffect(() => {
-    fetch(api('/api/status'))
-      .then(r => r.json())
-      .then(setStatus)
-      .catch(() => {});
+    Promise.all([
+      fetch(api('/api/status')).then(r => r.json()).catch(() => null),
+      fetch(api('/api/summary')).then(r => r.json()).catch(() => []),
+    ]).then(([statusData, summaryData]) => {
+      if (statusData) setStatus(statusData);
+      setSummary(summaryData);
+    });
   }, []);
 
   useEffect(() => {
@@ -120,6 +124,14 @@ export default function App() {
       </header>
 
       <main className="mx-auto max-w-5xl px-4 py-8">
+        <Suspense fallback={
+          <div className="flex justify-center py-16">
+            <svg className="h-8 w-8 animate-spin text-brand-500" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+            </svg>
+          </div>
+        }>
         {route.view === 'athlete' ? (
           <AthleteView
             firstName={route.firstName}
@@ -135,16 +147,7 @@ export default function App() {
           />
         ) : route.view === 'stats' ? (
           <StatsErrorBoundary>
-            <Suspense fallback={
-              <div className="flex justify-center py-16">
-                <svg className="h-8 w-8 animate-spin text-brand-500" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
-                </svg>
-              </div>
-            }>
-              <StatsView onBack={handleBack} />
-            </Suspense>
+            <StatsView onBack={handleBack} />
           </StatsErrorBoundary>
         ) : (
           /* Home view */
@@ -175,9 +178,10 @@ export default function App() {
               </div>
             </div>
 
-            <YearBrowser status={status} onViewRace={handleViewRace} />
+            <YearBrowser status={status} summary={summary} onViewRace={handleViewRace} />
           </div>
         )}
+        </Suspense>
       </main>
 
       <footer className="mt-16 border-t border-slate-200 bg-white py-6 text-center text-xs text-slate-400">
