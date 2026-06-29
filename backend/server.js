@@ -32,17 +32,20 @@ app.get(`${basePath}/api/results`, (req, res) => {
     limit:    +limit,
     offset:   +offset,
   });
+  res.set('Cache-Control', 'public, max-age=3600');
   res.json({ total, offset: +offset, limit: +limit, results });
 });
 
 // Demographics: gender splits and age group counts per year+raceType
 app.get(`${basePath}/api/demographics`, (req, res) => {
+  res.set('Cache-Control', 'public, max-age=3600');
   res.json(getDemographics());
 });
 
 // Year/race summary
 app.get(`${basePath}/api/summary`, async (req, res) => {
   const results = await loadResults();
+  res.set('Cache-Control', 'public, max-age=3600');
   res.json(getYearSummary(results));
 });
 
@@ -54,6 +57,7 @@ app.get(`${basePath}/api/athletes/search`, async (req, res) => {
   }
   const results = await loadResults();
   const athletes = searchAthletes(results, q);
+  res.set('Cache-Control', 'public, max-age=3600');
   res.json(athletes);
 });
 
@@ -90,6 +94,7 @@ app.get(`${basePath}/api/athletes/:lastName/:firstName`, (req, res) => {
       : { ...r, divRank: null, divTotal: null, triScore: null };
   });
 
+  res.set('Cache-Control', 'public, max-age=3600');
   res.json({
     firstName: annotated[0].firstName,
     lastName: annotated[0].lastName,

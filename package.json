@@ -1,6 +1,6 @@
 {
   "name": "griskus",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "private": true,
   "scripts": {
     "dev": "concurrently --names \"backend,frontend\" --prefix-colors \"cyan,magenta\" \"BACKEND_PORT=${BACKEND_PORT:-3731} PORT=${BACKEND_PORT:-3731} npm run dev --prefix backend\" \"BACKEND_PORT=${BACKEND_PORT:-3731} npm run dev --prefix frontend\"",

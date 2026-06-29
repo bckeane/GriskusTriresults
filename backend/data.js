@@ -9,6 +9,7 @@ const DB_FILE = join(__dirname, 'data', 'griskus.db');
 
 let db = null;
 let cache = null;
+let demographicsCache = null;
 
 function getDb() {
   if (db) return db;
@@ -135,6 +136,7 @@ function openDb() {
 
 export function invalidateCache() {
   cache = null;
+  demographicsCache = null;
 }
 
 // Search athletes by partial name match (case-insensitive)
@@ -356,6 +358,7 @@ function ageBracket(age) {
 // Returns per-year+raceType gender splits and age group counts.
 // Shape: [{ year, raceType, male, female, other, ageGroups: { U20, '20s', '30s', ... } }]
 export function getDemographics() {
+  if (demographicsCache) return demographicsCache;
   const conn = getDb();
   if (!conn) return [];
 
@@ -379,7 +382,8 @@ export function getDemographics() {
     if (bracket) entry.ageGroups[bracket] = (entry.ageGroups[bracket] ?? 0) + 1;
   }
 
-  return [...map.values()].sort((a, b) => b.year - a.year || a.raceType.localeCompare(b.raceType));
+  demographicsCache = [...map.values()].sort((a, b) => b.year - a.year || a.raceType.localeCompare(b.raceType));
+  return demographicsCache;
 }
 
 export function getYearSummary(results) {
